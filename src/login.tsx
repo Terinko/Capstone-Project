@@ -15,9 +15,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Query your users table
       const { data, error } = await supabase
-        .from("Student") // Replace 'users' with your actual table name
+        .from("Student")
         .select("*")
         .eq("Student_Qu_Email", email)
         .eq("Password", password)
@@ -27,11 +26,9 @@ export default function Login() {
         throw new Error("Invalid email or password");
       }
 
-      // Successfully logged in
+      //Successfully logged in
       console.log("Logged in:", data);
-      // Store user data or redirect here
-      // Example: localStorage.setItem('user', JSON.stringify(data));
-      // Example: navigate('/dashboard');
+      //navigate('/');
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
     } finally {
