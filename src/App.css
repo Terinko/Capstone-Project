@@ -1,7 +1,9 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
   text-align: center;
 }
 
@@ -42,7 +44,7 @@
 }
 
 .rectangle {
-  background-color: #D9D9D999;
+  background-color: #d9d9d999;
   border-radius: 33px;
   color: black;
   font-weight: 500;
@@ -55,13 +57,13 @@
 }
 
 .form-row {
-  display: block;              /* or `flex` + `flex-direction: column` */
+  display: block;
   font-size: large;
   margin-bottom: 5px;
 }
 
 .textbox {
-  background-color: #D9D9D9;
+  background-color: #d9d9d9;
   border-radius: 10px;
   border-style: none;
   color: black;

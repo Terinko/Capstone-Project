@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App.tsx";
 import Login from "./login.tsx";
 import CreateAccount from "./createAcct.tsx";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>

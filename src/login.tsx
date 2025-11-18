@@ -36,7 +36,7 @@ export default function Login() {
     }
   };
   return (
-    <div className="app-container">
+    <div className="app-container login-page d-flex flex-column align-items-center justify-content-center">
       <h2>Sign-In:</h2>
       <div className="rectangle">
         <form className="vertical" onSubmit={handleSubmit}>

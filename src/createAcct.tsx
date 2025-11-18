@@ -73,7 +73,7 @@ export default function CreateAccount() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container login-page d-flex flex-column align-items-center justify-content-center">
       <h2>Create Account</h2>
       <div className="rectangle">
         <form className="vertical" onSubmit={handleSubmit}>
