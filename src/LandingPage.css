@@ -7,7 +7,6 @@
   flex-direction: column;
 }
 
-/* Hero(background) */
 .hero-section {
   min-height: 40vh;
   padding: 3rem 1.5rem;
@@ -18,13 +17,11 @@
   background: linear-gradient(to right, #78a6c8, #0e2b4c);
 }
 
-/* hero(title) */
 .hero-title {
   font-size: clamp(2rem, 4vw + 1rem, 3.5rem);
   line-height: 1.15;
 }
 
-/* Initials avatar */
 .avatar-circle {
   width: 40px;
   height: 40px;
@@ -35,7 +32,6 @@
   font-weight: 700;
 }
 
-/* Center the main section text and buttons */
 .main-section-center {
   text-align: center;
   display: flex;
@@ -43,7 +39,6 @@
   align-items: center;
 }
 
-/* buttons */
 .cta-buttons {
   display: flex;
   justify-content: center;
