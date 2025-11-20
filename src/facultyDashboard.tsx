@@ -1,110 +1,43 @@
-import React, { useState } from "react";
+// src/pages/dashboard.tsx
+import React, { useState, type ChangeEvent, type FormEvent } from 'react';
 import "./StudentDashboard.css";
 import quLogo from "./assets/Q_logo.png";
 
-// Define types for majors and classes
-type MajorOption =
-  | "Software Engineering"
-  | "Computer Science"
-  | "Mechanical Engineering"
-  | "Industrial Engineering";
-
-interface ClassOption {
-  id: string;
-  label: string;
-  skills: string[];
+/* ---------- Types ------------------------------------------------------- */
+interface Course {
+  id: number;
+  name: string;
+  skills?: string;
+  competencies?: string;
 }
 
-const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
-  {
-    id: "1",
-    label: "SER 491",
-    skills: [
-      "Developed full stack web applications using modern frameworks.",
-      "Collaborated in Agile teams to plan, implement, and review features.",
-      "Applied software design principles to build maintainable code.",
-      "Used version control (Git) and code reviews in a team setting.",
-    ],
-  },
-  { id: "2", label: "SER 340", skills: [] },
-  { id: "3", label: "SER 341", skills: [] },
-  { id: "4", label: "SER 325", skills: [] },
-  { id: "5", label: "SER 350", skills: [] },
-  { id: "6", label: "SER 330", skills: [] },
-  { id: "7", label: "SER 210", skills: [] },
-  { id: "8", label: "SER 492", skills: [] },
-  { id: "9", label: "SER 225", skills: [] },
-  { id: "10", label: "SER 375", skills: [] },
-  { id: "11", label: "SER 120", skills: [] },
-  { id: "12", label: "SER 305", skills: [] },
-];
+/* ---------- Component ---------------------------------------------------- */
+const FacultyDashboard: React.FC = () => {
+  /* ---------- State -----------------------------------------------------*/
+  const [courseName, setCourseName] = useState('');
+  const [courseSkills, setCourseSkills] = useState('');
+  const [courseCompetencies, setCourseCompetencies] = useState('');
 
-// Map majors to their respective classes
-const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
-  "Software Engineering": SOFTWARE_ENGINEERING_CLASSES,
-  "Computer Science": [],
-  "Mechanical Engineering": [],
-  "Industrial Engineering": [],
-};
+  const [courses, setCourses] = useState<Course[]>([]);
 
-//Selected major and classes state management
-const StudentDashboard: React.FC = () => {
-  const [major, setMajor] = useState<MajorOption>("Software Engineering");
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [bullets, setBullets] = useState<string[]>([]);
+  /* ---------- Helpers ---------------------------------------------------*/
+  // simple incremental id generator – works fine for a demo
+  let nextId = Math.max(
+    ...courses.map(c => c.id),
+  ) + 1;
 
-  const availableClasses = MAJOR_CLASSES[major];
-
-  // Toggle class selection
-  const handleClassToggle = (id: string) => {
-    setSelectedClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  const addCourse = (e: FormEvent) => {
+    e.preventDefault();
+    if (!courseName.trim()) return;
+    setCourses(prev =>
+      [...prev, { id: nextId++, name: courseName.trim(), skills: courseSkills.trim(), competencies: courseCompetencies.trim() }]
     );
+    setCourseName('');
+    setCourseSkills('');
+    setCourseCompetencies('');
   };
 
-  // Generate bullet points based on selected classes
-  const handleGenerate = () => {
-    // No class data configured for this major yet
-    if (!availableClasses || availableClasses.length === 0) {
-      setBullets([
-        `Class-based bullet points for ${major} are coming soon.`,
-        "For now, try selecting Software Engineering to see an example.",
-      ]);
-      return;
-    }
-
-    if (selectedClasses.length === 0) {
-      setBullets(["Select at least one class to generate bullet points."]);
-      return;
-    }
-
-    // Collect skills from selected classes
-    const selectedClassObjects = availableClasses.filter((c) =>
-      selectedClasses.includes(c.id)
-    );
-    const collectedSkills = selectedClassObjects.flatMap((c) => c.skills);
-
-    if (collectedSkills.length === 0) {
-      // No skills mapped yet for these specific classes
-      setBullets(["No skills have been mapped yet for the selected classes."]);
-      return;
-    }
-
-    setBullets(collectedSkills);
-  };
-
-  // Download bullet points as a text file
-  const handleDownload = () => {
-    const text = bullets.join("\n");
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "generated-bullet-points.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
+  /* ---------- Render ---------------------------------------------------- */
   return (
     <div className="dashboard-page">
       {/* NavBar */}
@@ -153,118 +86,53 @@ const StudentDashboard: React.FC = () => {
           </p>
         </section>
 
-        {/* Build schedule */}
-        <section className="card-section">
-          <div className="card-surface">
-            <h2 className="card-title">Build Your Schedule</h2>
+      {/* ─────────────────────── Courses ─────────────────────── */}
+      <section style={styles.section}>
+        <h2>Courses</h2>
+        <form onSubmit={addCourse} style={styles.form}>
+          <input
+            type="text"
+            placeholder="Course name"
+            value={courseName}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setCourseName(e.target.value)}
+            required
+            style={styles.input}
+          />
+          <textarea
+            placeholder="Skills"
+            value={courseSkills}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCourseSkills(e.target.value)}
+            style={{ ...styles.input, height: 60 }}
+          />
+          <textarea
+            placeholder="Competencies"
+            value={courseCompetencies}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCourseCompetencies(e.target.value)}
+            style={{ ...styles.input, height: 60 }}
+          />
+          <button type="submit" style={styles.button}>Add Course</button>
+        </form>
 
-            {/* Select major */}
-            <div className="card-row">
-              <label className="field-label" htmlFor="major-select">
-                Select Major:
-              </label>
-              <div className="major-row">
-                <select
-                  id="major-select"
-                  className="major-select"
-                  value={major}
-                  onChange={(e) => {
-                    const newMajor = e.target.value as MajorOption;
-                    setMajor(newMajor);
-                    setSelectedClasses([]); // reset class selections when major changes
-                  }}
+        {courses.length ? (
+          <ul style={styles.list}>
+            {courses.map(c => (
+              <li key={c.id} style={styles.listItem}>
+                <strong>{c.name}</strong> – {c.skills || 'No skills'} – {c.competencies || 'No competencies'}
+                <button
+                  onClick={() => setCourses(prev => prev.filter(pc => pc.id !== c.id))}
+                  style={styles.deleteButton}
                 >
-                  <option value="Software Engineering">
-                    Software Engineering
-                  </option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Mechanical Engineering">
-                    Mechanical Engineering
-                  </option>
-                  <option value="Industrial Engineering">
-                    Industrial Engineering
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            {/* Class grid */}
-            <div className="card-row">
-              <span className="field-label">Select Classes:</span>
-
-              {availableClasses && availableClasses.length > 0 ? (
-                <div className="class-grid">
-                  {availableClasses.map((c) => (
-                    <label key={c.id} className="class-option">
-                      <input
-                        type="checkbox"
-                        checked={selectedClasses.includes(c.id)}
-                        onChange={() => handleClassToggle(c.id)}
-                      />
-                      <span>{c.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p
-                  className="text-muted"
-                  style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
-                >
-                  Class selection will be available for this major soon. Try
-                  Software Engineering to see an example.
-                </p>
-              )}
-            </div>
-
-            {/* Generate button */}
-            <div className="generate-row">
-              <button
-                type="button"
-                className="btn-generate"
-                onClick={handleGenerate}
-              >
-                Generate
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Generated bullet points */}
-        <section className="card-section">
-          <div className="card-surface bullets-card">
-            <div className="bullets-header">
-              <h2 className="card-title">Generated Bullet Points:</h2>
-              <button
-                type="button"
-                className="btn btn-link p-0"
-                onClick={handleDownload}
-                aria-label="Download bullet points"
-              >
-                <i
-                  className="bi bi-download"
-                  style={{ fontSize: "1.25rem" }}
-                ></i>
-              </button>
-            </div>
-
-            <div className="bullets-body">
-              {bullets.length === 0 ? (
-                <p className="placeholder-text">
-                  Bullet points will appear here after you generate them.
-                </p>
-              ) : (
-                <ul>
-                  {bullets.map((b, idx) => (
-                    <li key={idx}>{b}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </section>
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No courses added yet.</p>
+        )}
+      </section>
       </main>
-
-      {/* Footer */}
+       {/* Footer */}
       <footer className="dashboard-footer">
         <span>Quinnipiac Resume Services</span>
         <button type="button" className="footer-link">
@@ -275,4 +143,51 @@ const StudentDashboard: React.FC = () => {
   );
 };
 
-export default StudentDashboard;
+/* ---------- Inline CSS ---------------------------------------------- */
+const styles: Record<string, React.CSSProperties> = {
+  container: { maxWidth: 900, margin: '0 auto', padding: 20, fontFamily: 'Arial, sans-serif' },
+  header: { textAlign: 'center', color: '#333' },
+
+  section: { marginBottom: 40, border: '1px solid #ddd', borderRadius: 8, padding: 20, background: '#f9f9f9' },
+  form: { display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 400 },
+
+  input: {
+    padding: 8,
+    fontSize: 14,
+    borderRadius: 4,
+    border: '1px solid #ccc',
+  },
+  button: {
+    alignSelf: 'flex-start',
+    padding: '6px 12px',
+    background: '#0069d9',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 4,
+    cursor: 'pointer',
+  },
+
+  list: { marginTop: 20, listStyle: 'none', paddingLeft: 0 },
+  listItem: {
+    padding: '8px 12px',
+    marginBottom: 6,
+    background: '#fff',
+    borderRadius: 4,
+    border: '1px solid #ddd',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  deleteButton: {
+    padding: '2px 8px',
+    fontSize: 12,
+    background: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 4,
+    cursor: 'pointer',
+  },
+};
+
+export default FacultyDashboard;
