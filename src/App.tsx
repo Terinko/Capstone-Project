@@ -1,9 +1,11 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import CreateAccountModal from "./CreateAccountModal";
+import LoginModal from "./LoginModal";
 import "./LandingPage.css";
 
 const App: React.FC = () => {
-  const navigate = useNavigate();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   return (
     <div className="landing-page bg-light min-vh-100 d-flex flex-column">
@@ -32,7 +34,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-dark px-4 py-2"
-                onClick={() => navigate("/login")}
+                onClick={() => setShowLoginModal(true)}
               >
                 Log In
               </button>
@@ -40,7 +42,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-outline-dark px-4 py-2"
-                onClick={() => navigate("/createaccount")}
+                onClick={() => setShowCreateModal(true)}
               >
                 Create Account
               </button>
@@ -107,6 +109,16 @@ const App: React.FC = () => {
           </div>
         </section>
       </main>
+
+      <LoginModal
+        showModal={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
+
+      <CreateAccountModal
+        showModal={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };
