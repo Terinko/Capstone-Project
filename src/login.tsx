@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
+import { useNavigate } from "react-router-dom";
 import "./app.css";
 import "./login.css";
 
@@ -8,6 +9,8 @@ export default function Login() {
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +32,7 @@ export default function Login() {
       //Successfully logged in
       console.log("Logged in:", data);
       //navigate('/');
+      navigate("/studentdashboard");
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
     } finally {
