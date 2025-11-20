@@ -7,7 +7,6 @@ const App: React.FC = () => {
 
   return (
     <div className="landing-page bg-light min-vh-100 d-flex flex-column">
-      {/* hero(background) */}
       <header className="hero-section d-flex align-items-center justify-content-center">
         <div className="text-center px-3">
           <h1 className="hero-title fw-bold text-white mb-0">
@@ -16,8 +15,6 @@ const App: React.FC = () => {
           </h1>
         </div>
       </header>
-
-      {/* main content */}
       <main className="flex-grow-1">
         <section className="container-fluid py-5 main-section-center">
           <div className="content-wrapper text-center">
@@ -50,8 +47,6 @@ const App: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {/* testimonials */}
         <section className="container-fluid pb-5">
           <div className="content-wrapper text-center">
             <h2 className="h3 fw-bold mb-1">Testimonials</h2>
