@@ -63,7 +63,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         // alert("Student account created successfully!");
         resetForm();
         onClose();
-        navigate("/");
+        navigate("/studentdashboard");
       } else {
         const { data: existingUser } = await supabase
           .from("Faculty_Admin")

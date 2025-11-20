@@ -32,8 +32,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
         console.log("Student logged in:", studentData);
         resetForm();
         onClose();
-        // Navigate to student dashboard or home
-        // navigate('/student-dashboard');
+        //Navigate to student dashboard
+        navigate("/studentdashboard");
         return;
       }
 
