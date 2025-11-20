@@ -7,6 +7,12 @@
   flex-direction: column;
 }
 
+.login-page {
+  background: linear-gradient(to right, #78a6c8, #0e2b4c);
+  min-height: 100vh;
+  width: 100%;
+}
+
 .hero-section {
   min-height: 40vh;
   padding: 3rem 1.5rem;
