@@ -92,7 +92,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         // alert("Faculty/Administrator account created successfully!");
         resetForm();
         onClose();
-        navigate("/");
+        navigate("/facultyAdmin");
       }
     } catch (err: any) {
       setError(err.message || "Failed to create account");
