@@ -21,6 +21,7 @@
 .dashboard-title-block {
   text-align: center;
   margin-bottom: 1.5rem;
+  color: #131d43;
 }
 
 .dashboard-title {
@@ -67,9 +68,11 @@
 /* Form/control labels */
 .field-label {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 500;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.15rem;
+  text-align: left;
+  padding: 0.4rem;
 }
 
 /* Major row */
@@ -78,6 +81,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-top: 0.5rem;
 }
 
 .major-select {
@@ -115,9 +119,32 @@
   padding: 0.5rem 2.5rem;
   border-radius: 999px;
   border: none;
-  background: #1f2937;
-  color: #ffffff;
+  background: #131d43;
+  color: #ffb718;
   font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Copy button in case we switch from icon*/
+.btn-copy {
+  padding: 0.5rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  background: #131d43;
+  color: #ffb718;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+/*export button */
+.btn-export {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: #131d43;
+  color: #ffb718;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -134,12 +161,19 @@
   margin-bottom: 0.75rem;
 }
 
-/* download icon button */
+/* copy button as icon */
 .icon-button {
   border: none;
   background: transparent;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   cursor: pointer;
+  color: #131d43;
+  padding: 0.25rem;
+  transition: color 0.15s ease;
+  margin-left: 0.25rem;
+}
+.icon-button:hover {
+  color: #ffb718;
 }
 
 .bullets-body {

@@ -93,6 +93,13 @@ const StudentDashboard: React.FC = () => {
     setBullets(collectedSkills);
   };
 
+  // Copy bullet points to clipboard
+  const handleCopy = () => {
+    if (bullets.length === 0) return;
+    navigator.clipboard.writeText(bullets.join("\n"));
+    alert("Bullet points copied to clipboard!");
+  };
+
   // Download bullet points as a text file
   const handleDownload = () => {
     const text = bullets.join("\n");
@@ -134,7 +141,9 @@ const StudentDashboard: React.FC = () => {
         <div className="collapse navbar-collapse" id="navbarSupportedContent">
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
             <li className="nav-item">
-              <button className="btn btn-link nav-link">Profile</button>
+              <button className="btn btn-link nav-link icon-button:hover">
+                Profile
+              </button>
             </li>
             <li className="nav-item">
               <button className="btn btn-link nav-link">Sign Out</button>
@@ -159,33 +168,28 @@ const StudentDashboard: React.FC = () => {
             <h2 className="card-title">Build Your Schedule</h2>
 
             {/* Select major */}
-            <div className="card-row">
-              <label className="field-label" htmlFor="major-select">
-                Select Major:
-              </label>
-              <div className="major-row">
-                <select
-                  id="major-select"
-                  className="major-select"
-                  value={major}
-                  onChange={(e) => {
-                    const newMajor = e.target.value as MajorOption;
-                    setMajor(newMajor);
-                    setSelectedClasses([]); // reset class selections when major changes
-                  }}
-                >
-                  <option value="Software Engineering">
-                    Software Engineering
-                  </option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Mechanical Engineering">
-                    Mechanical Engineering
-                  </option>
-                  <option value="Industrial Engineering">
-                    Industrial Engineering
-                  </option>
-                </select>
-              </div>
+            <div className="major-row">
+              <select
+                id="major-select"
+                className="major-select"
+                value={major}
+                onChange={(e) => {
+                  const newMajor = e.target.value as MajorOption;
+                  setMajor(newMajor);
+                  setSelectedClasses([]); // reset class selections when major changes
+                }}
+              >
+                <option value="Software Engineering">
+                  Software Engineering
+                </option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Mechanical Engineering">
+                  Mechanical Engineering
+                </option>
+                <option value="Industrial Engineering">
+                  Industrial Engineering
+                </option>
+              </select>
             </div>
 
             {/* Class grid */}
@@ -234,17 +238,26 @@ const StudentDashboard: React.FC = () => {
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">Generated Bullet Points:</h2>
-              <button
-                type="button"
-                className="btn btn-link p-0"
-                onClick={handleDownload}
-                aria-label="Download bullet points"
-              >
-                <i
-                  className="bi bi-download"
-                  style={{ fontSize: "1.25rem" }}
-                ></i>
-              </button>
+
+              <div className="bullets-button">
+                <button
+                  type="button"
+                  className="btn-export"
+                  onClick={handleDownload}
+                  aria-label="Download bullet points"
+                >
+                  Export
+                </button>
+
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={handleCopy}
+                  aria-label="Download bullet points"
+                >
+                  <i className="bi bi-clipboard"></i>
+                </button>
+              </div>
             </div>
 
             <div className="bullets-body">
