@@ -26,7 +26,7 @@ interface AdminCourseRow {
 const MOCK_ROWS: AdminCourseRow[] = [
   {
     id: 1,
-    course: "SER 210",
+    course: "SER-210",
     major: "Software Engineering",
     completion: "Mapped",
     skills: ["Skill 1", "Skill 2", "Skill 3"],
@@ -34,7 +34,7 @@ const MOCK_ROWS: AdminCourseRow[] = [
   },
   {
     id: 2,
-    course: "SER 350",
+    course: "SER-350",
     major: "Software Engineering",
     completion: "Mapped",
     skills: ["Skill 1", "Skill 2", "Skill 3"],
@@ -42,7 +42,7 @@ const MOCK_ROWS: AdminCourseRow[] = [
   },
   {
     id: 3,
-    course: "SER 491",
+    course: "SER-491",
     major: "Software Engineering",
     completion: "Unmapped",
     skills: ["Skill 1", "Skill 2"],
@@ -50,7 +50,7 @@ const MOCK_ROWS: AdminCourseRow[] = [
   },
   {
     id: 4,
-    course: "CS 200",
+    course: "CSC-210",
     major: "Computer Science",
     completion: "Unmapped",
     skills: [],
@@ -58,7 +58,7 @@ const MOCK_ROWS: AdminCourseRow[] = [
   },
   {
     id: 5,
-    course: "ME 220",
+    course: "MER-240",
     major: "Mechanical Engineering",
     completion: "Mapped",
     skills: ["Skill 1"],
