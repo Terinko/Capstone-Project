@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import Footer from "./footer";
 import "./StudentDashboard.css";
-import quLogo from "./assets/Q_logo.png";
+import Navbar from "./Navbar";
 
 // Define types for majors and classes
 type MajorOption =
@@ -114,43 +115,7 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="dashboard-page">
-      {/* NavBar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
-        <a className="navbar-brand d-flex align-items-center">
-          <img
-            src={quLogo}
-            alt="Quinnipiac University logo"
-            height={50}
-            width={45}
-            style={{ display: "block" }}
-          />
-        </a>
-
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarSupportedContent"
-          aria-controls="navbarSupportedContent"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-
-        <div className="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-            <li className="nav-item">
-              <button className="btn btn-link nav-link icon-button:hover">
-                Profile
-              </button>
-            </li>
-            <li className="nav-item">
-              <button className="btn btn-link nav-link">Sign Out</button>
-            </li>
-          </ul>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* main content */}
       <main className="dashboard-main">
@@ -278,12 +243,7 @@ const StudentDashboard: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="dashboard-footer">
-        <span>Quinnipiac Resume Services</span>
-        <button type="button" className="footer-link">
-          Learn More
-        </button>
-      </footer>
+      <Footer />
     </div>
   );
 };

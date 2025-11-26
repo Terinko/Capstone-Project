@@ -1,5 +1,6 @@
 // src/pages/dashboard.tsx
-import React, { useState, type ChangeEvent, type FormEvent } from 'react';
+import React, { useState, type ChangeEvent, type FormEvent } from "react";
+import Footer from "./footer";
 import "./StudentDashboard.css";
 import quLogo from "./assets/Q_logo.png";
 
@@ -14,27 +15,31 @@ interface Course {
 /* ---------- Component ---------------------------------------------------- */
 const FacultyDashboard: React.FC = () => {
   /* ---------- State -----------------------------------------------------*/
-  const [courseName, setCourseName] = useState('');
-  const [courseSkills, setCourseSkills] = useState('');
-  const [courseCompetencies, setCourseCompetencies] = useState('');
+  const [courseName, setCourseName] = useState("");
+  const [courseSkills, setCourseSkills] = useState("");
+  const [courseCompetencies, setCourseCompetencies] = useState("");
 
   const [courses, setCourses] = useState<Course[]>([]);
 
   /* ---------- Helpers ---------------------------------------------------*/
   // simple incremental id generator – works fine for a demo
-  let nextId = Math.max(
-    ...courses.map(c => c.id),
-  ) + 1;
+  let nextId = Math.max(...courses.map((c) => c.id)) + 1;
 
   const addCourse = (e: FormEvent) => {
     e.preventDefault();
     if (!courseName.trim()) return;
-    setCourses(prev =>
-      [...prev, { id: nextId++, name: courseName.trim(), skills: courseSkills.trim(), competencies: courseCompetencies.trim() }]
-    );
-    setCourseName('');
-    setCourseSkills('');
-    setCourseCompetencies('');
+    setCourses((prev) => [
+      ...prev,
+      {
+        id: nextId++,
+        name: courseName.trim(),
+        skills: courseSkills.trim(),
+        competencies: courseCompetencies.trim(),
+      },
+    ]);
+    setCourseName("");
+    setCourseSkills("");
+    setCourseCompetencies("");
   };
 
   /* ---------- Render ---------------------------------------------------- */
@@ -86,107 +91,124 @@ const FacultyDashboard: React.FC = () => {
           </p>
         </section>
 
-      {/* ─────────────────────── Courses ─────────────────────── */}
-      <section style={styles.section}>
-        <h2>Courses</h2>
-        <form onSubmit={addCourse} style={styles.form}>
-          <input
-            type="text"
-            placeholder="Course name"
-            value={courseName}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setCourseName(e.target.value)}
-            required
-            style={styles.input}
-          />
-          <textarea
-            placeholder="Skills"
-            value={courseSkills}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCourseSkills(e.target.value)}
-            style={{ ...styles.input, height: 60 }}
-          />
-          <textarea
-            placeholder="Competencies"
-            value={courseCompetencies}
-            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCourseCompetencies(e.target.value)}
-            style={{ ...styles.input, height: 60 }}
-          />
-          <button type="submit" style={styles.button}>Add Course</button>
-        </form>
+        {/* ─────────────────────── Courses ─────────────────────── */}
+        <section style={styles.section}>
+          <h2>Courses</h2>
+          <form onSubmit={addCourse} style={styles.form}>
+            <input
+              type="text"
+              placeholder="Course name"
+              value={courseName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setCourseName(e.target.value)
+              }
+              required
+              style={styles.input}
+            />
+            <textarea
+              placeholder="Skills"
+              value={courseSkills}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                setCourseSkills(e.target.value)
+              }
+              style={{ ...styles.input, height: 60 }}
+            />
+            <textarea
+              placeholder="Competencies"
+              value={courseCompetencies}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                setCourseCompetencies(e.target.value)
+              }
+              style={{ ...styles.input, height: 60 }}
+            />
+            <button type="submit" style={styles.button}>
+              Add Course
+            </button>
+          </form>
 
-        {courses.length ? (
-          <ul style={styles.list}>
-            {courses.map(c => (
-              <li key={c.id} style={styles.listItem}>
-                <strong>{c.name}</strong> – {c.skills || 'No skills'} – {c.competencies || 'No competencies'}
-                <button
-                  onClick={() => setCourses(prev => prev.filter(pc => pc.id !== c.id))}
-                  style={styles.deleteButton}
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No courses added yet.</p>
-        )}
-      </section>
+          {courses.length ? (
+            <ul style={styles.list}>
+              {courses.map((c) => (
+                <li key={c.id} style={styles.listItem}>
+                  <strong>{c.name}</strong> – {c.skills || "No skills"} –{" "}
+                  {c.competencies || "No competencies"}
+                  <button
+                    onClick={() =>
+                      setCourses((prev) => prev.filter((pc) => pc.id !== c.id))
+                    }
+                    style={styles.deleteButton}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No courses added yet.</p>
+          )}
+        </section>
       </main>
-       {/* Footer */}
-      <footer className="dashboard-footer">
-        <span>Quinnipiac Resume Services</span>
-        <button type="button" className="footer-link">
-          Learn More
-        </button>
-      </footer>
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
 
 /* ---------- Inline CSS ---------------------------------------------- */
 const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: 900, margin: '0 auto', padding: 20, fontFamily: 'Arial, sans-serif' },
-  header: { textAlign: 'center', color: '#333' },
+  container: {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: 20,
+    fontFamily: "Arial, sans-serif",
+  },
+  header: { textAlign: "center", color: "#333" },
 
-  section: { marginBottom: 40, border: '1px solid #ddd', borderRadius: 8, padding: 20, background: '#f9f9f9' },
-  form: { display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 400 },
+  section: {
+    marginBottom: 40,
+    border: "1px solid #ddd",
+    borderRadius: 8,
+    padding: 20,
+    background: "#f9f9f9",
+  },
+  form: { display: "flex", flexDirection: "column", gap: 10, maxWidth: 400 },
 
   input: {
     padding: 8,
     fontSize: 14,
     borderRadius: 4,
-    border: '1px solid #ccc',
+    border: "1px solid #ccc",
   },
   button: {
-    alignSelf: 'flex-start',
-    padding: '6px 12px',
-    background: '#0069d9',
-    color: '#fff',
-    border: 'none',
+    alignSelf: "flex-start",
+    padding: "6px 12px",
+    background: "#0069d9",
+    color: "#fff",
+    border: "none",
     borderRadius: 4,
-    cursor: 'pointer',
+    cursor: "pointer",
   },
 
-  list: { marginTop: 20, listStyle: 'none', paddingLeft: 0 },
+  list: { marginTop: 20, listStyle: "none", paddingLeft: 0 },
   listItem: {
-    padding: '8px 12px',
+    padding: "8px 12px",
     marginBottom: 6,
-    background: '#fff',
+    background: "#fff",
     borderRadius: 4,
-    border: '1px solid #ddd',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    border: "1px solid #ddd",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   deleteButton: {
-    padding: '2px 8px',
+    padding: "2px 8px",
     fontSize: 12,
-    background: '#dc3545',
-    color: '#fff',
-    border: 'none',
+    background: "#dc3545",
+    color: "#fff",
+    border: "none",
     borderRadius: 4,
-    cursor: 'pointer',
+    cursor: "pointer",
   },
 };
 
