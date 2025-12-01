@@ -50,7 +50,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
         resetForm();
         onClose();
         // Navigate to faculty dashboard or home
-        // navigate('/faculty-dashboard');
+        navigate("/facultyAdmin");
         return;
       }
 

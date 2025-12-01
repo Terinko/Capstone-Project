@@ -21,6 +21,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const [major, setMajor] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const AUTOFACULTY = false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +79,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         const { data, error } = await supabase
           .from("Faculty_Admin")
           .insert({
+            Type: AUTOFACULTY,
             Faculty_Qu_Email: email,
             Password: password,
             FirstName: firstName,
