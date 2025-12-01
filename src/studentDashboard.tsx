@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import Footer from "./footer";
 import "./StudentDashboard.css";
-import quLogo from "./assets/Q_logo.png";
+import Navbar from "./Navbar";
 
 // Define types for majors and classes
 type MajorOption =
@@ -93,6 +94,13 @@ const StudentDashboard: React.FC = () => {
     setBullets(collectedSkills);
   };
 
+  // Copy bullet points to clipboard
+  const handleCopy = () => {
+    if (bullets.length === 0) return;
+    navigator.clipboard.writeText(bullets.join("\n"));
+    alert("Bullet points copied to clipboard!");
+  };
+
   // Download bullet points as a text file
   const handleDownload = () => {
     const text = bullets.join("\n");
@@ -107,41 +115,7 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="dashboard-page">
-      {/* NavBar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
-        <a className="navbar-brand d-flex align-items-center">
-          <img
-            src={quLogo}
-            alt="Quinnipiac University logo"
-            height={50}
-            width={45}
-            style={{ display: "block" }}
-          />
-        </a>
-
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarSupportedContent"
-          aria-controls="navbarSupportedContent"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-
-        <div className="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-            <li className="nav-item">
-              <button className="btn btn-link nav-link">Profile</button>
-            </li>
-            <li className="nav-item">
-              <button className="btn btn-link nav-link">Sign Out</button>
-            </li>
-          </ul>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* main content */}
       <main className="dashboard-main">
@@ -159,33 +133,28 @@ const StudentDashboard: React.FC = () => {
             <h2 className="card-title">Build Your Schedule</h2>
 
             {/* Select major */}
-            <div className="card-row">
-              <label className="field-label" htmlFor="major-select">
-                Select Major:
-              </label>
-              <div className="major-row">
-                <select
-                  id="major-select"
-                  className="major-select"
-                  value={major}
-                  onChange={(e) => {
-                    const newMajor = e.target.value as MajorOption;
-                    setMajor(newMajor);
-                    setSelectedClasses([]); // reset class selections when major changes
-                  }}
-                >
-                  <option value="Software Engineering">
-                    Software Engineering
-                  </option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Mechanical Engineering">
-                    Mechanical Engineering
-                  </option>
-                  <option value="Industrial Engineering">
-                    Industrial Engineering
-                  </option>
-                </select>
-              </div>
+            <div className="major-row">
+              <select
+                id="major-select"
+                className="major-select"
+                value={major}
+                onChange={(e) => {
+                  const newMajor = e.target.value as MajorOption;
+                  setMajor(newMajor);
+                  setSelectedClasses([]); // reset class selections when major changes
+                }}
+              >
+                <option value="Software Engineering">
+                  Software Engineering
+                </option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Mechanical Engineering">
+                  Mechanical Engineering
+                </option>
+                <option value="Industrial Engineering">
+                  Industrial Engineering
+                </option>
+              </select>
             </div>
 
             {/* Class grid */}
@@ -234,17 +203,26 @@ const StudentDashboard: React.FC = () => {
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">Generated Bullet Points:</h2>
-              <button
-                type="button"
-                className="btn btn-link p-0"
-                onClick={handleDownload}
-                aria-label="Download bullet points"
-              >
-                <i
-                  className="bi bi-download"
-                  style={{ fontSize: "1.25rem" }}
-                ></i>
-              </button>
+
+              <div className="bullets-button">
+                <button
+                  type="button"
+                  className="btn-export"
+                  onClick={handleDownload}
+                  aria-label="Download bullet points"
+                >
+                  Export
+                </button>
+
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={handleCopy}
+                  aria-label="Download bullet points"
+                >
+                  <i className="bi bi-clipboard"></i>
+                </button>
+              </div>
             </div>
 
             <div className="bullets-body">
@@ -265,12 +243,7 @@ const StudentDashboard: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="dashboard-footer">
-        <span>Quinnipiac Resume Services</span>
-        <button type="button" className="footer-link">
-          Learn More
-        </button>
-      </footer>
+      <Footer />
     </div>
   );
 };

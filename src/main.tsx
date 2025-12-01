@@ -6,6 +6,7 @@ import "./App.css";
 import App from "./App.tsx";
 import StudentDashboard from "./studentDashboard.tsx";
 import FacultyDashboard from "./facultyDashboard.tsx";
+import AdminDashboard from "./AdminDashboard.tsx";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
         <Route index element={<App />}></Route>
         <Route path="/studentdashboard" element={<StudentDashboard />}></Route>
         <Route path="/facultyAdmin" element={<FacultyDashboard />}></Route>
+        <Route path="/adminDashboard" element={<AdminDashboard />}></Route>
       </Route>
     </Routes>
   </BrowserRouter>
