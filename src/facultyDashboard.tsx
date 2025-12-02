@@ -1,8 +1,10 @@
 // src/pages/dashboard.tsx
 import React, { useState, type ChangeEvent, type FormEvent } from "react";
 import Footer from "./footer";
+import "./FacultyDashboard.css";
 import "./StudentDashboard.css";
 import quLogo from "./assets/Q_logo.png";
+import CourseCard from "./components/courseCard";
 
 /* ---------- Types ------------------------------------------------------- */
 interface Course {
@@ -92,60 +94,57 @@ const FacultyDashboard: React.FC = () => {
         </section>
 
         {/* ─────────────────────── Courses ─────────────────────── */}
-        <section style={styles.section}>
-          <h2>Courses</h2>
-          <form onSubmit={addCourse} style={styles.form}>
-            <input
-              type="text"
-              placeholder="Course name"
-              value={courseName}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setCourseName(e.target.value)
-              }
-              required
-              style={styles.input}
-            />
-            <textarea
-              placeholder="Skills"
-              value={courseSkills}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                setCourseSkills(e.target.value)
-              }
-              style={{ ...styles.input, height: 60 }}
-            />
-            <textarea
-              placeholder="Competencies"
-              value={courseCompetencies}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                setCourseCompetencies(e.target.value)
-              }
-              style={{ ...styles.input, height: 60 }}
-            />
-            <button type="submit" style={styles.button}>
-              Add Course
-            </button>
-          </form>
-
-          {courses.length ? (
-            <ul style={styles.list}>
-              {courses.map((c) => (
-                <li key={c.id} style={styles.listItem}>
-                  <strong>{c.name}</strong> – {c.skills || "No skills"} –{" "}
-                  {c.competencies || "No competencies"}
-                  <button
-                    onClick={() =>
-                      setCourses((prev) => prev.filter((pc) => pc.id !== c.id))
-                    }
-                    style={styles.deleteButton}
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No courses added yet.</p>
-          )}
+        <section className="card-section">
+          <div className="card-surface">
+            <h2>Courses</h2>
+            <form onSubmit={addCourse} style={styles.form}>
+              <input
+                className="textbox"
+                type="text"
+                placeholder="Course name"
+                value={courseName}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setCourseName(e.target.value)
+                }
+                required
+                style={styles.input}
+              />
+              <textarea
+                className="textbox"
+                placeholder="Skills"
+                value={courseSkills}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setCourseSkills(e.target.value)
+                }
+                style={{ ...styles.input, height: 60 }}
+              />
+              <textarea
+                className="textbox"
+                placeholder="Competencies"
+                value={courseCompetencies}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setCourseCompetencies(e.target.value)
+                }
+                style={{ ...styles.input, height: 60 }}
+              />
+              <button type="submit" style={styles.button}>
+                Add Course
+              </button>
+            </form>
+          </div>
+        </section>
+        <section className="card-section">
+          <div className="card-surface">
+            {courses.map((c) => (
+              <div>
+                <CourseCard id={c.id} name={c.name} skills={[c.skills ?? ""]} competencies={[c.competencies ?? ""]} deleteMethod={
+                  () => setCourses((prev) =>
+                    prev.filter((pc) => pc.name !== c.name)
+                  )
+                }/>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
       {/* Footer */}
@@ -171,16 +170,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 20,
     background: "#f9f9f9",
   },
-  form: { display: "flex", flexDirection: "column", gap: 10, maxWidth: 400 },
+  form: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10 },
 
   input: {
     padding: 8,
     fontSize: 14,
     borderRadius: 4,
     border: "1px solid #ccc",
+    width: "100%",
   },
   button: {
-    alignSelf: "flex-start",
     padding: "6px 12px",
     background: "#0069d9",
     color: "#fff",
