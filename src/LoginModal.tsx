@@ -20,7 +20,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
     setLoading(true);
 
     try {
-      //We want to check both tables so that the user doesn't have to specify their type
+      // 1) Try Student table
       const { data: studentData, error: studentError } = await supabase
         .from("Student")
         .select("*")
@@ -30,14 +30,21 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
 
       if (studentData) {
         console.log("Student logged in:", studentData);
+
+        // Save session info for Navbar/EditAccountModal
+        localStorage.setItem("userId", String(studentData.Student_Id));
+        localStorage.setItem("userType", "Student");
+        localStorage.setItem("userEmail", studentData.Student_Qu_Email);
+
         resetForm();
         onClose();
-        //Navigate to student dashboard
+
+        // Navigate to student dashboard
         navigate("/studentdashboard");
         return;
       }
 
-      //Now check the admin table
+      // 2) Try Faculty_Admin table
       const { data: facultyData, error: facultyError } = await supabase
         .from("Faculty_Admin")
         .select("*")
@@ -47,10 +54,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
 
       if (facultyData) {
         console.log("Faculty/Admin logged in:", facultyData);
+
+        // Save session info
+        localStorage.setItem("userId", String(facultyData.Faculty_Id));
+        localStorage.setItem("userType", "Faculty/Administrator");
+        localStorage.setItem("userEmail", facultyData.Faculty_Qu_Email);
+
         resetForm();
         onClose();
-        // Navigate to faculty dashboard or home
-        // navigate('/faculty-dashboard');
+
+        // Navigate to faculty/admin dashboard
+        navigate("/facultyAdmin");
         return;
       }
 
