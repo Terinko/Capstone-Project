@@ -99,6 +99,7 @@ const FacultyDashboard: React.FC = () => {
             <h2>Courses</h2>
             <form onSubmit={addCourse} style={styles.form}>
               <input
+                className="textbox"
                 type="text"
                 placeholder="Course name"
                 value={courseName}
@@ -109,6 +110,7 @@ const FacultyDashboard: React.FC = () => {
                 style={styles.input}
               />
               <textarea
+                className="textbox"
                 placeholder="Skills"
                 value={courseSkills}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -117,6 +119,7 @@ const FacultyDashboard: React.FC = () => {
                 style={{ ...styles.input, height: 60 }}
               />
               <textarea
+                className="textbox"
                 placeholder="Competencies"
                 value={courseCompetencies}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>

@@ -1,0 +1,29 @@
+.rectangle {
+    border-radius: 10px;
+    background-color: white;
+    margin: 20px;
+    margin-bottom: 1.75rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+    gap: 20px;
+}
+
+.listItems {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: auto;
+    gap: 20px;
+    width: max-content;
+}
+
+.courseButton {
+    border-radius: 10px;
+    background-color: #131d43;
+    border-color: #ffb718;
+    border-width: 5px;
+    color: #ffb718;
+}
