@@ -39,7 +39,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         const { data: existingUser } = await supabase
           .from("Student")
           .select("*")
-          .eq("Student_Qu_Email", email)
+          .eq("Student_Qu_Email", email + "@quinnipiac.edu")
           .single();
 
         if (existingUser) {
@@ -49,7 +49,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         const { data, error } = await supabase
           .from("Student")
           .insert({
-            Student_Qu_Email: email,
+            Student_Qu_Email: email + "@quinnipiac.edu",
             Password: password,
             FirstName: firstName,
             LastName: lastName,
@@ -69,7 +69,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         const { data: existingUser } = await supabase
           .from("Faculty_Admin")
           .select("*")
-          .eq("Faculty_Qu_Email", email)
+          .eq("Faculty_Qu_Email", email + "@quinnipiac.edu")
           .single();
 
         if (existingUser) {
@@ -80,7 +80,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
           .from("Faculty_Admin")
           .insert({
             Type: AUTOFACULTY,
-            Faculty_Qu_Email: email,
+            Faculty_Qu_Email: email + "@quinnipiac.edu",
             Password: password,
             FirstName: firstName,
             LastName: lastName,
@@ -133,7 +133,6 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       >
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Create Account</h5>
             <button
               type="button"
               className="btn-close"
@@ -143,7 +142,6 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
           <div className="modal-body">
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label">Account Type</label>
                 <select
                   className="form-select"
                   value={userType}
@@ -158,70 +156,75 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
               </div>
 
               <div className="mb-3">
-                <label className="form-label">First Name</label>
                 <input
                   type="text"
                   className="form-control"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
+                  placeholder="First Name..."
                 />
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Last Name</label>
                 <input
                   type="text"
                   className="form-control"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
+                  placeholder="Last Name..."
                 />
               </div>
 
               {userType === "Student" && (
                 <div className="mb-3">
-                  <label className="form-label">Major</label>
                   <input
                     type="text"
                     className="form-control"
                     value={major}
                     onChange={(e) => setMajor(e.target.value)}
                     required
+                    placeholder="Major"
                   />
                 </div>
               )}
 
               <div className="mb-3">
-                <label className="form-label">Quinnipiac E-Mail</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <div className="input-group">
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="Quinnipiac E-Mail"
+                  />
+                  <span className="input-group-text" id="basic-addon2">
+                    @quinnipiac.edu
+                  </span>
+                </div>
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Password</label>
                 <input
                   type="password"
                   className="form-control"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  placeholder="Password"
                 />
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Confirm Password</label>
                 <input
                   type="password"
                   className="form-control"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  placeholder="Confirm Password"
                 />
               </div>
 

@@ -9,6 +9,7 @@ interface LoginModalProps {
 
 const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
   const navigate = useNavigate();
+  // 'email' state now technically holds the 'username' part
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -19,12 +20,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
     setError("");
     setLoading(true);
 
+    const fullEmail = `${email}@quinnipiac.edu`;
+
     try {
-      //We want to check both tables so that the user doesn't have to specify their type
+      // We want to check both tables so that the user doesn't have to specify their type
       const { data: studentData, error: studentError } = await supabase
         .from("Student")
         .select("*")
-        .eq("Student_Qu_Email", email)
+        .eq("Student_Qu_Email", fullEmail)
         .eq("Password", password)
         .single();
 
@@ -32,16 +35,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
         console.log("Student logged in:", studentData);
         resetForm();
         onClose();
-        //Navigate to student dashboard
+        // Navigate to student dashboard
         navigate("/studentdashboard");
         return;
       }
 
-      //Now check the admin table
+      // Now check the admin table
       const { data: facultyData, error: facultyError } = await supabase
         .from("Faculty_Admin")
         .select("*")
-        .eq("Faculty_Qu_Email", email)
+        .eq("Faculty_Qu_Email", fullEmail)
         .eq("Password", password)
         .single();
 
@@ -87,7 +90,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
       >
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Sign In</h5>
             <button
               type="button"
               className="btn-close"
@@ -97,24 +99,29 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
           <div className="modal-body">
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label">Quinnipiac E-Mail</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <div className="input-group">
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="Quinnipiac E-Mail"
+                  />
+                  <span className="input-group-text" id="basic-addon2">
+                    @quinnipiac.edu
+                  </span>
+                </div>
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Password</label>
                 <input
                   type="password"
                   className="form-control"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  placeholder="Password"
                 />
               </div>
 
