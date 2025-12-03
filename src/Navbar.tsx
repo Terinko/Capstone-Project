@@ -1,30 +1,29 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Navbar.css";
 import quLogo from "./assets/Qyellow_logo.png";
 import EditAccountModal from "./EditAccountModal";
-
-type UserType = "Student" | "Faculty/Administrator";
+import { loadSession, clearSession, type UserType } from "./Session";
 
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [userType, setUserType] = useState<UserType | null>(null);
+  const navigate = useNavigate();
 
-  // Read user info from localStorage once on mount
+  // Read user info from session once on mount
   useEffect(() => {
-    const storedId = localStorage.getItem("userId");
-    const storedType = localStorage.getItem("userType") as UserType | null;
-
-    if (storedId) {
-      setUserId(Number(storedId));
-    }
-    if (storedType === "Student" || storedType === "Faculty/Administrator") {
-      setUserType(storedType);
+    const session = loadSession();
+    if (session) {
+      setUserId(session.userId);
+      setUserType(session.userType);
+    } else {
+      setUserId(null);
+      setUserType(null);
     }
   }, []);
 
   const handleProfileClick = () => {
-    // Only open modal if we know who the user is
     if (userId && userType) {
       setShowEditModal(true);
     } else {
@@ -34,6 +33,13 @@ const Navbar: React.FC = () => {
 
   const handleCloseModal = () => {
     setShowEditModal(false);
+  };
+
+  const handleSignOut = () => {
+    clearSession();
+    setUserId(null);
+    setUserType(null);
+    navigate("/");
   };
 
   return (
@@ -67,13 +73,14 @@ const Navbar: React.FC = () => {
               </button>
             </li>
             <li className="nav-item">
-              <button className="nav-btn">Sign Out</button>
+              <button className="nav-btn" onClick={handleSignOut}>
+                Sign Out
+              </button>
             </li>
           </ul>
         </div>
       </nav>
 
-      {/* Modal lives here, controlled entirely by Navbar */}
       {showEditModal && userId !== null && userType && (
         <EditAccountModal
           showModal={showEditModal}

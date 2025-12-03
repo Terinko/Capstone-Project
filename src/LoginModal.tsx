@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { saveSession } from "./Session";
 
 interface LoginModalProps {
   showModal: boolean;
@@ -31,10 +32,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
       if (studentData) {
         console.log("Student logged in:", studentData);
 
-        // Save session info for Navbar/EditAccountModal
-        localStorage.setItem("userId", String(studentData.Student_Id));
-        localStorage.setItem("userType", "Student");
-        localStorage.setItem("userEmail", studentData.Student_Qu_Email);
+        saveSession({
+          userId: studentData.Student_Id,
+          userType: "Student",
+          userEmail: studentData.Student_Qu_Email,
+        });
 
         resetForm();
         onClose();
@@ -55,16 +57,27 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
       if (facultyData) {
         console.log("Faculty/Admin logged in:", facultyData);
 
-        // Save session info
-        localStorage.setItem("userId", String(facultyData.Faculty_Id));
-        localStorage.setItem("userType", "Faculty/Administrator");
-        localStorage.setItem("userEmail", facultyData.Faculty_Qu_Email);
+        saveSession({
+          userId: facultyData.Faculty_Id,
+          userType: "Faculty/Administrator",
+          userEmail: facultyData.Faculty_Qu_Email,
+        });
 
         resetForm();
         onClose();
 
-        // Navigate to faculty/admin dashboard
-        navigate("/facultyAdmin");
+        const isAdmin =
+          facultyData.Faculty_Qu_Email?.toLowerCase() ===
+          "sample.admin@quinnipiac.edu";
+
+        if (isAdmin) {
+          // Go to admin dashboard
+          navigate("/adminDashboard"); // <-- use your actual admin route here
+        } else {
+          // Normal faculty dashboard
+          navigate("/facultyAdmin");
+        }
+
         return;
       }
 

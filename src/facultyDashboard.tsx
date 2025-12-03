@@ -3,8 +3,8 @@ import React, { useState, type ChangeEvent, type FormEvent } from "react";
 import Footer from "./footer";
 import "./FacultyDashboard.css";
 import "./StudentDashboard.css";
-import quLogo from "./assets/Q_logo.png";
-import CourseCard from "./components/courseCard";
+import Navbar from "./Navbar";
+import CourseCard from "./components/CourseCard";
 
 /* ---------- Types ------------------------------------------------------- */
 interface Course {
@@ -47,42 +47,7 @@ const FacultyDashboard: React.FC = () => {
   /* ---------- Render ---------------------------------------------------- */
   return (
     <div className="dashboard-page">
-      {/* NavBar */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4">
-        <a className="navbar-brand d-flex align-items-center">
-          <img
-            src={quLogo}
-            alt="Quinnipiac University logo"
-            height={50}
-            width={45}
-            style={{ display: "block" }}
-          />
-        </a>
-
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarSupportedContent"
-          aria-controls="navbarSupportedContent"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-
-        <div className="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-            <li className="nav-item">
-              <button className="btn btn-link nav-link">Profile</button>
-            </li>
-            <li className="nav-item">
-              <button className="btn btn-link nav-link">Sign Out</button>
-            </li>
-          </ul>
-        </div>
-      </nav>
-
+      <Navbar />
       {/* main content */}
       <main className="dashboard-main">
         {/* Title + subtitle */}
@@ -137,11 +102,17 @@ const FacultyDashboard: React.FC = () => {
           <div className="card-surface">
             {courses.map((c) => (
               <div>
-                <CourseCard id={c.id} name={c.name} skills={[c.skills ?? ""]} competencies={[c.competencies ?? ""]} deleteMethod={
-                  () => setCourses((prev) =>
-                    prev.filter((pc) => pc.name !== c.name)
-                  )
-                }/>
+                <CourseCard
+                  id={c.id}
+                  name={c.name}
+                  skills={[c.skills ?? ""]}
+                  competencies={[c.competencies ?? ""]}
+                  deleteMethod={() =>
+                    setCourses((prev) =>
+                      prev.filter((pc) => pc.name !== c.name)
+                    )
+                  }
+                />
               </div>
             ))}
           </div>
@@ -170,7 +141,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 20,
     background: "#f9f9f9",
   },
-  form: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10 },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 10,
+  },
 
   input: {
     padding: 8,

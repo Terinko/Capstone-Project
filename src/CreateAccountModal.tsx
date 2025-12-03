@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { saveSession } from "./Session";
 
 interface CreateAccountModalProps {
   showModal: boolean;
@@ -62,6 +63,13 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
         console.log("Student account created:", data);
         // alert("Student account created successfully!");
+
+        saveSession({
+          userId: data.Student_Id,
+          userType: "Student",
+          userEmail: data.Student_Qu_Email,
+        });
+
         resetForm();
         onClose();
         navigate("/studentdashboard");
@@ -92,6 +100,13 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
         console.log("Faculty/Admin account created:", data);
         // alert("Faculty/Administrator account created successfully!");
+
+        saveSession({
+          userId: data.Faculty_Id,
+          userType: "Faculty/Administrator",
+          userEmail: data.Faculty_Qu_Email,
+        });
+
         resetForm();
         onClose();
         navigate("/facultyAdmin");
