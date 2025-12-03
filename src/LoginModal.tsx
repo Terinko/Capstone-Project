@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { saveSession } from "./Session";
 
 interface LoginModalProps {
   showModal: boolean;
@@ -9,7 +10,6 @@ interface LoginModalProps {
 
 const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
   const navigate = useNavigate();
-  // 'email' state now technically holds the 'username' part
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -33,9 +33,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
 
       if (studentData) {
         console.log("Student logged in:", studentData);
+
+        saveSession({
+          userId: studentData.Student_Id,
+          userType: "Student",
+          userEmail: studentData.Student_Qu_Email,
+        });
+
         resetForm();
         onClose();
-        // Navigate to student dashboard
+
+        //Navigate to student dashboard
         navigate("/studentdashboard");
         return;
       }
@@ -50,10 +58,26 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
 
       if (facultyData) {
         console.log("Faculty/Admin logged in:", facultyData);
+
+        saveSession({
+          userId: facultyData.Faculty_Id,
+          userType: "Faculty/Administrator",
+          userEmail: facultyData.Faculty_Qu_Email,
+        });
+
         resetForm();
         onClose();
-        // Navigate to faculty dashboard or home
-        navigate("/facultyAdmin");
+
+        const isAdmin =
+          facultyData.Faculty_Qu_Email?.toLowerCase() ===
+          "sample.admin@quinnipiac.edu";
+
+        if (isAdmin) {
+          navigate("/adminDashboard");
+        } else {
+          navigate("/facultyAdmin");
+        }
+
         return;
       }
 
