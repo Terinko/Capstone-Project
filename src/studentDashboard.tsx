@@ -55,10 +55,8 @@ const fetchWithExponentialBackoff = async (
   }
 };
 
-// Helper to safely get property regardless of casing (handles course_id vs Course_Id)
 const getVal = (obj: any, key: string) => {
   if (!obj) return undefined;
-  // Check exact match
   if (obj[key] !== undefined) return obj[key];
   // Check lowercase match
   if (obj[key.toLowerCase()] !== undefined) return obj[key.toLowerCase()];
@@ -67,7 +65,6 @@ const getVal = (obj: any, key: string) => {
   return undefined;
 };
 
-// --- [Type Definitions] ---
 type MajorOption =
   | "Software Engineering"
   | "Computer Science"
@@ -77,7 +74,7 @@ type MajorOption =
 interface ClassOption {
   id: string;
   label: string;
-  courseId?: string; // Maps to Course_Id in database
+  courseId?: string;
 }
 
 interface Skill {
@@ -87,7 +84,6 @@ interface Skill {
   Description: string;
 }
 
-// Hardcoded class lists
 const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
   { id: "1", label: "SER 491", courseId: "SER491" },
   { id: "2", label: "SER 340", courseId: "SER340" },
@@ -116,23 +112,19 @@ const StudentDashboard: React.FC = () => {
   const [bullets, setBullets] = useState<string[]>([]);
   const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
 
-  // State for AI processing
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
-  // Tech Demo Toggle State
   const [showRawSkills, setShowRawSkills] = useState<boolean>(false);
 
   const availableClasses = MAJOR_CLASSES[major];
 
-  // --- [Load Skills from Database] ---
   useEffect(() => {
     const loadSkillsForClasses = async () => {
       setIsLoadingSkills(true);
 
       try {
-        // Strip "SER" to get just the number (e.g. "350")
         const courseIds = availableClasses
           .map((c) => c.courseId?.replace(/\D/g, ""))
           .filter(Boolean) as string[];
@@ -143,7 +135,6 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        // 1. Fetch course-skill mappings
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
@@ -156,7 +147,6 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        // 2. Normalize Mappings and Extract unique Skill IDs
         const normalizedMappings = mappingsData.map((m) => ({
           Course_Id: getVal(m, "Course_Id"),
           Skill_Id: getVal(m, "Skill_Id"),
@@ -166,7 +156,6 @@ const StudentDashboard: React.FC = () => {
           ...new Set(normalizedMappings.map((m) => m.Skill_Id)),
         ];
 
-        // 3. Fetch details for those skills
         const { data: skillsData, error: skillsError } = await supabase
           .from("Skills")
           .select("*")
@@ -174,10 +163,8 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
-        // 4. Map skills back to courses
         const skillsMap: Record<string, Skill[]> = {};
 
-        // Normalize skills data for easier lookup
         const normalizedSkills = (skillsData || []).map((s) => ({
           Skill_Id: getVal(s, "Skill_Id"),
           Skill_Name: getVal(s, "Skill_Name"),
@@ -186,7 +173,6 @@ const StudentDashboard: React.FC = () => {
         }));
 
         courseIds.forEach((courseId) => {
-          // Compare strings to avoid BigInt vs String issues
           const courseSkillMappings = normalizedMappings.filter(
             (m) => String(m.Course_Id) === String(courseId)
           );
@@ -221,7 +207,6 @@ const StudentDashboard: React.FC = () => {
     );
   };
 
-  // --- [Gemini Integration] ---
   const generateWithGemini = async (skillDescriptions: string[]) => {
     setIsLoading(true);
     setErrorMsg(null);
@@ -282,7 +267,6 @@ const StudentDashboard: React.FC = () => {
       return;
     }
 
-    // Get the courseIds for selected classes
     const selectedClassObjects = availableClasses.filter((c) =>
       selectedClasses.includes(c.id)
     );
@@ -290,7 +274,6 @@ const StudentDashboard: React.FC = () => {
     const skillDescriptions: string[] = [];
 
     selectedClassObjects.forEach((classObj) => {
-      // Ensure we use the numeric ID (e.g., "350") to look up skills
       const lookupId = classObj.courseId?.replace(/\D/g, "");
 
       if (lookupId && courseSkills[lookupId]) {
@@ -307,10 +290,8 @@ const StudentDashboard: React.FC = () => {
     }
 
     if (showRawSkills) {
-      // Direct raw skill display for demo
       setBullets(skillDescriptions);
     } else {
-      // AI Generation
       generateWithGemini(skillDescriptions);
     }
   };
