@@ -72,7 +72,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
 
         if (isAdmin) {
           // Go to admin dashboard
-          navigate("/adminDashboard"); // <-- use your actual admin route here
+          navigate("/adminDashboard");
         } else {
           // Normal faculty dashboard
           navigate("/facultyAdmin");
