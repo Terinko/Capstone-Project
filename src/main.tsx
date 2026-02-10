@@ -24,5 +24,3 @@ createRoot(document.getElementById("root")!).render(
     </Routes>
   </BrowserRouter>,
 );
-
-//The Key for OpenRouter: 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
