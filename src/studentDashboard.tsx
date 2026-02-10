@@ -6,15 +6,14 @@ import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
 
-// --- [API Configuration] ---
-const API_KEY = "AIzaSyCl9P8ucVOlZRAZDAUjiMJwYlxXEu2HL1w";
-const GENERATE_CONTENT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+const API_KEY = import.meta.env.VITE_AIAPIKEY;
+const OPENROUTER_URL = import.meta.env.VITE_OPEN_ROUTER_URL;
+const MODEL_ID = import.meta.env.VITE_MODEL_ID; // Specifically for the free version
 
-// --- [Utility Functions] ---
 const fetchWithExponentialBackoff = async (
   url: string,
   payload: any,
-  maxRetries = 5
+  maxRetries = 5,
 ) => {
   let delay = 1000;
   for (let i = 0; i < maxRetries; i++) {
@@ -31,7 +30,7 @@ const fetchWithExponentialBackoff = async (
         } else {
           const errorResult = await response.json();
           throw new Error(
-            errorResult?.error?.message || `HTTP error ${response.status}`
+            errorResult?.error?.message || `HTTP error ${response.status}`,
           );
         }
       }
@@ -174,13 +173,13 @@ const StudentDashboard: React.FC = () => {
 
         courseIds.forEach((courseId) => {
           const courseSkillMappings = normalizedMappings.filter(
-            (m) => String(m.Course_Id) === String(courseId)
+            (m) => String(m.Course_Id) === String(courseId),
           );
 
           const skills = courseSkillMappings
             .map((mapping) => {
               const foundSkill = normalizedSkills.find(
-                (skill) => String(skill.Skill_Id) === String(mapping.Skill_Id)
+                (skill) => String(skill.Skill_Id) === String(mapping.Skill_Id),
               );
               return foundSkill;
             })
@@ -203,18 +202,16 @@ const StudentDashboard: React.FC = () => {
 
   const handleClassToggle = (id: string) => {
     setSelectedClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
-  const generateWithGemini = async (skillDescriptions: string[]) => {
+  const generateWithGemma = async (skillDescriptions: string[]) => {
     setIsLoading(true);
     setErrorMsg(null);
-    setBullets([]);
 
     try {
-      const prompt = `
-        Act as a professional resume writer.
+      const prompt = `Act as a professional resume writer.
         I will provide a list of raw skills and tasks learned in university courses.
         Please transform these into a list of strong, action-oriented resume bullet points.
         
@@ -229,15 +226,27 @@ const StudentDashboard: React.FC = () => {
       `;
 
       const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
+        model: MODEL_ID, // Uses google/gemma-3-27b-it:free
+        messages: [{ role: "user", content: prompt }],
       };
 
-      const result = await fetchWithExponentialBackoff(
-        GENERATE_CONTENT_URL,
-        payload
-      );
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Student Resume Dashboard",
+        },
+        body: JSON.stringify(payload),
+      });
 
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+
+      const result = await response.json();
+
+      // OpenRouter returns results in result.choices[0].message.content
+      const text = result.choices?.[0]?.message?.content || "";
 
       const formattedBullets = text
         .split("\n")
@@ -246,8 +255,8 @@ const StudentDashboard: React.FC = () => {
 
       setBullets(formattedBullets);
     } catch (error: any) {
-      console.error("Gemini API Error:", error);
-      setErrorMsg("Failed to generate bullets. Please check your connection.");
+      console.error("OpenRouter Error:", error);
+      setErrorMsg("Failed to generate bullets with Gemma 3.");
     } finally {
       setIsLoading(false);
     }
@@ -268,7 +277,7 @@ const StudentDashboard: React.FC = () => {
     }
 
     const selectedClassObjects = availableClasses.filter((c) =>
-      selectedClasses.includes(c.id)
+      selectedClasses.includes(c.id),
     );
 
     const skillDescriptions: string[] = [];
@@ -292,7 +301,7 @@ const StudentDashboard: React.FC = () => {
     if (showRawSkills) {
       setBullets(skillDescriptions);
     } else {
-      generateWithGemini(skillDescriptions);
+      generateWithGemma(skillDescriptions);
     }
   };
 
