@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient"; // same as CreateAccountModal
+import { supabase } from "../supabaseClient";
 // :contentReference[oaicite:0]{index=0}
 
 type UserType = "Student" | "Faculty/Administrator";
@@ -20,7 +20,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [major, setMajor] = useState(""); // students only
+  const [major, setMajor] = useState("");
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,7 +30,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Load user from DB when modal opens
   useEffect(() => {
     if (!showModal || !userId) return;
 
@@ -151,7 +150,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               <p>Loading account...</p>
             ) : (
               <form onSubmit={handleSubmit}>
-                {/* Account type (read-only) */}
                 <div className="mb-3">
                   <label className="form-label">Account Type</label>
                   <input
