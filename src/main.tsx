@@ -22,5 +22,5 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/unmapped" element={<UnmappedCourses />}></Route>
       </Route>
     </Routes>
-  </BrowserRouter>
+  </BrowserRouter>,
 );
