@@ -84,18 +84,19 @@ interface Skill {
 }
 
 const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
-  { id: "1", label: "SER 491", courseId: "SER491" },
-  { id: "2", label: "SER 340", courseId: "SER340" },
-  { id: "3", label: "SER 341", courseId: "SER341" },
-  { id: "4", label: "SER 325", courseId: "SER325" },
-  { id: "5", label: "SER 350", courseId: "SER350" },
-  { id: "6", label: "SER 330", courseId: "SER330" },
-  { id: "7", label: "SER 210", courseId: "SER210" },
-  { id: "8", label: "SER 492", courseId: "SER492" },
-  { id: "9", label: "SER 225", courseId: "SER225" },
-  { id: "10", label: "SER 375", courseId: "SER375" },
-  { id: "11", label: "SER 120", courseId: "SER120" },
-  { id: "12", label: "SER 305", courseId: "SER305" },
+  // UPDATE ALL items to use the dash format "SER-XXX"
+  { id: "1", label: "SER-491", courseId: "SER-491" },
+  { id: "2", label: "SER-340", courseId: "SER-340" },
+  { id: "3", label: "SER-341", courseId: "SER-341" },
+  { id: "4", label: "SER-325", courseId: "SER-325" },
+  { id: "5", label: "SER-350", courseId: "SER-350" },
+  { id: "6", label: "SER-330", courseId: "SER-330" },
+  { id: "7", label: "SER-210", courseId: "SER-210" },
+  { id: "8", label: "SER-492", courseId: "SER-492" },
+  { id: "9", label: "SER-225", courseId: "SER-225" },
+  { id: "10", label: "SER-375", courseId: "SER-375" },
+  { id: "11", label: "SER-120", courseId: "SER-120" },
+  { id: "12", label: "SER-305", courseId: "SER-305" },
 ];
 
 const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
@@ -124,20 +125,49 @@ const StudentDashboard: React.FC = () => {
       setIsLoadingSkills(true);
 
       try {
-        const courseIds = availableClasses
-          .map((c) => c.courseId?.replace(/\D/g, ""))
+        // 1. Get the course codes (now "SER-491") from the updated config
+        const courseCodes = availableClasses
+          .map((c) => c.courseId)
           .filter(Boolean) as string[];
 
-        if (courseIds.length === 0) {
+        if (courseCodes.length === 0) {
           setCourseSkills({});
           setIsLoadingSkills(false);
           return;
         }
 
+        // 2. LOOKUP STEP: Exchange "SER-491" for the numeric Course_Id
+        const { data: coursesData, error: coursesError } = await supabase
+          .from("Courses")
+          .select("Course_Id, Course_Code")
+          .in("Course_Code", courseCodes);
+
+        if (coursesError) throw coursesError;
+
+        if (!coursesData || coursesData.length === 0) {
+          console.warn("No courses found in DB matching:", courseCodes);
+          setCourseSkills({});
+          return;
+        }
+
+        // 3. Prepare the list of Numeric IDs to fetch mappings
+        const courseIdMap: Record<number, string> = {};
+        const validNumericIds: number[] = [];
+
+        coursesData.forEach((c) => {
+          const cId = getVal(c, "Course_Id");
+          const cCode = getVal(c, "Course_Code");
+          if (cId) {
+            validNumericIds.push(cId);
+            courseIdMap[cId] = cCode; // Map ID 15 -> "SER-491"
+          }
+        });
+
+        // 4. Fetch Mappings using the Numeric IDs
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
-          .in("Course_Id", courseIds);
+          .in("Course_Id", validNumericIds);
 
         if (mappingsError) throw mappingsError;
 
@@ -146,13 +176,9 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        const normalizedMappings = mappingsData.map((m) => ({
-          Course_Id: getVal(m, "Course_Id"),
-          Skill_Id: getVal(m, "Skill_Id"),
-        }));
-
+        // 5. Fetch Skills
         const skillIds = [
-          ...new Set(normalizedMappings.map((m) => m.Skill_Id)),
+          ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
         ];
 
         const { data: skillsData, error: skillsError } = await supabase
@@ -162,36 +188,49 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
-        const skillsMap: Record<string, Skill[]> = {};
+        // 6. Build the final map
+        const skillsLookup: Record<string, Skill[]> = {};
 
-        const normalizedSkills = (skillsData || []).map((s) => ({
+        const allSkills = (skillsData || []).map((s) => ({
           Skill_Id: getVal(s, "Skill_Id"),
-          Skill_Name: getVal(s, "Skill_Name"),
+          Skill_Name: getVal(s, "Skill_name"),
           Type: getVal(s, "Type"),
           Description: getVal(s, "Description"),
         }));
 
-        courseIds.forEach((courseId) => {
-          const courseSkillMappings = normalizedMappings.filter(
-            (m) => String(m.Course_Id) === String(courseId),
-          );
+        mappingsData.forEach((mapping) => {
+          const mCourseId = getVal(mapping, "Course_Id");
+          const mSkillId = getVal(mapping, "Skill_Id");
 
-          const skills = courseSkillMappings
-            .map((mapping) => {
-              const foundSkill = normalizedSkills.find(
-                (skill) => String(skill.Skill_Id) === String(mapping.Skill_Id),
-              );
-              return foundSkill;
-            })
-            .filter(Boolean) as Skill[];
+          // Convert Numeric ID back to "SER-491" so the dashboard knows where to put it
+          const courseCodeStr = courseIdMap[mCourseId];
 
-          skillsMap[courseId] = skills;
+          if (courseCodeStr) {
+            const skillDetail = allSkills.find(
+              (s) => String(s.Skill_Id) === String(mSkillId),
+            );
+            if (skillDetail) {
+              if (!skillsLookup[courseCodeStr]) {
+                skillsLookup[courseCodeStr] = [];
+              }
+              // Avoid duplicates
+              if (
+                !skillsLookup[courseCodeStr].some(
+                  (s) => s.Skill_Id === skillDetail.Skill_Id,
+                )
+              ) {
+                skillsLookup[courseCodeStr].push(skillDetail);
+              }
+            }
+          }
         });
 
-        setCourseSkills(skillsMap);
+        setCourseSkills(skillsLookup);
       } catch (error: any) {
         console.error("Error loading skills:", error);
-        setErrorMsg("Failed to load skills from database.");
+        setErrorMsg(
+          `Database Error: ${error.message || "Failed to load skills"}`,
+        );
       } finally {
         setIsLoadingSkills(false);
       }
@@ -283,7 +322,7 @@ const StudentDashboard: React.FC = () => {
     const skillDescriptions: string[] = [];
 
     selectedClassObjects.forEach((classObj) => {
-      const lookupId = classObj.courseId?.replace(/\D/g, "");
+      const lookupId = classObj.courseId;
 
       if (lookupId && courseSkills[lookupId]) {
         const descriptions = courseSkills[lookupId]
