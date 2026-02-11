@@ -14,7 +14,7 @@ const GENERATE_CONTENT_URL = `https://generativelanguage.googleapis.com/v1beta/m
 const fetchWithExponentialBackoff = async (
   url: string,
   payload: any,
-  maxRetries = 5
+  maxRetries = 5,
 ) => {
   let delay = 1000;
   for (let i = 0; i < maxRetries; i++) {
@@ -31,7 +31,7 @@ const fetchWithExponentialBackoff = async (
         } else {
           const errorResult = await response.json();
           throw new Error(
-            errorResult?.error?.message || `HTTP error ${response.status}`
+            errorResult?.error?.message || `HTTP error ${response.status}`,
           );
         }
       }
@@ -174,13 +174,13 @@ const StudentDashboard: React.FC = () => {
 
         courseIds.forEach((courseId) => {
           const courseSkillMappings = normalizedMappings.filter(
-            (m) => String(m.Course_Id) === String(courseId)
+            (m) => String(m.Course_Id) === String(courseId),
           );
 
           const skills = courseSkillMappings
             .map((mapping) => {
               const foundSkill = normalizedSkills.find(
-                (skill) => String(skill.Skill_Id) === String(mapping.Skill_Id)
+                (skill) => String(skill.Skill_Id) === String(mapping.Skill_Id),
               );
               return foundSkill;
             })
@@ -203,7 +203,7 @@ const StudentDashboard: React.FC = () => {
 
   const handleClassToggle = (id: string) => {
     setSelectedClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -234,7 +234,7 @@ const StudentDashboard: React.FC = () => {
 
       const result = await fetchWithExponentialBackoff(
         GENERATE_CONTENT_URL,
-        payload
+        payload,
       );
 
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -268,7 +268,7 @@ const StudentDashboard: React.FC = () => {
     }
 
     const selectedClassObjects = availableClasses.filter((c) =>
-      selectedClasses.includes(c.id)
+      selectedClasses.includes(c.id),
     );
 
     const skillDescriptions: string[] = [];
