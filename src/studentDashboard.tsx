@@ -83,29 +83,6 @@ interface Skill {
   Description: string;
 }
 
-const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
-  // UPDATE ALL items to use the dash format "SER-XXX"
-  { id: "1", label: "SER-491", courseId: "SER-491" },
-  { id: "2", label: "SER-340", courseId: "SER-340" },
-  { id: "3", label: "SER-341", courseId: "SER-341" },
-  { id: "4", label: "SER-325", courseId: "SER-325" },
-  { id: "5", label: "SER-350", courseId: "SER-350" },
-  { id: "6", label: "SER-330", courseId: "SER-330" },
-  { id: "7", label: "SER-210", courseId: "SER-210" },
-  { id: "8", label: "SER-492", courseId: "SER-492" },
-  { id: "9", label: "SER-225", courseId: "SER-225" },
-  { id: "10", label: "SER-375", courseId: "SER-375" },
-  { id: "11", label: "SER-120", courseId: "SER-120" },
-  { id: "12", label: "SER-305", courseId: "SER-305" },
-];
-
-const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
-  "Software Engineering": SOFTWARE_ENGINEERING_CLASSES,
-  "Computer Science": [],
-  "Mechanical Engineering": [],
-  "Industrial Engineering": [],
-};
-
 const StudentDashboard: React.FC = () => {
   const [major, setMajor] = useState<MajorOption>("Software Engineering");
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -118,7 +95,18 @@ const StudentDashboard: React.FC = () => {
 
   const [showRawSkills, setShowRawSkills] = useState<boolean>(false);
 
-  const availableClasses = MAJOR_CLASSES[major];
+  const [majorClasses, setMajorClasses] = useState<Record<MajorOption, ClassOption[]> | null>(null);
+
+  // Define an async function
+  const fetchMajorClasses = async () => {
+    const response = await fetch('http://localhost:3001/courses');
+    const result = await response.json();
+    setMajorClasses(result);
+  };
+
+  fetchMajorClasses()
+
+  const availableClasses = majorClasses ? majorClasses[major] : [];
 
   useEffect(() => {
     const loadSkillsForClasses = async () => {
