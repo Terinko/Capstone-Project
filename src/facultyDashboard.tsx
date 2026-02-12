@@ -19,28 +19,6 @@ interface ClassOption {
   courseId?: string;
 }
 
-const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
-  { id: "1", label: "SER-491", courseId: "SER-491" },
-  { id: "2", label: "SER-340", courseId: "SER-340" },
-  { id: "3", label: "SER-341", courseId: "SER-341" },
-  { id: "4", label: "SER-325", courseId: "SER-325" },
-  { id: "5", label: "SER-350", courseId: "SER-350" },
-  { id: "6", label: "SER-330", courseId: "SER-330" },
-  { id: "7", label: "SER-210", courseId: "SER-210" },
-  { id: "8", label: "SER-492", courseId: "SER-492" },
-  { id: "9", label: "SER-225", courseId: "SER-225" },
-  { id: "10", label: "SER-375", courseId: "SER-375" },
-  { id: "11", label: "SER-120", courseId: "SER-120" },
-  { id: "12", label: "SER-305", courseId: "SER-305" },
-];
-
-const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
-  "Software Engineering": SOFTWARE_ENGINEERING_CLASSES,
-  "Computer Science": [],
-  "Mechanical Engineering": [],
-  "Industrial Engineering": [],
-};
-
 /* ---------- Types ------------------------------------------------------- */
 interface Course {
   id: number;
@@ -88,6 +66,17 @@ const FacultyDashboard: React.FC = () => {
     setCourseName(""); // Reset course selection when major changes
   };
 
+  const [majorClasses, setMajorClasses] = useState<Record<MajorOption, ClassOption[]> | null>(null);
+
+  // Define an async function
+  const fetchMajorClasses = async () => {
+    const response = await fetch('http://localhost:3001/courses');
+    const result = await response.json();
+    setMajorClasses(result);
+  };
+
+  fetchMajorClasses()
+
   /* ---------- Render ---------------------------------------------------- */
   return (
     <div className="dashboard-page">
@@ -118,18 +107,18 @@ const FacultyDashboard: React.FC = () => {
                 >
                   Select Major:
                 </label>
-                <select
+                {majorClasses ? (<select
                   className="textbox"
                   value={selectedMajor}
                   onChange={handleMajorChange}
                   style={styles.input}
                 >
-                  {Object.keys(MAJOR_CLASSES).map((major) => (
+                  {Object.keys(majorClasses).map((major) => (
                     <option key={major} value={major}>
                       {major}
                     </option>
                   ))}
-                </select>
+                </select>) : (<p></p>)}
               </div>
 
               {/* Course Selection (Radio Buttons) */}
@@ -143,9 +132,9 @@ const FacultyDashboard: React.FC = () => {
                 >
                   Select Course:
                 </label>
-                {MAJOR_CLASSES[selectedMajor].length > 0 ? (
+                {majorClasses && majorClasses[selectedMajor].length > 0 ? (
                   <div className="class-grid">
-                    {MAJOR_CLASSES[selectedMajor].map((c) => (
+                    {majorClasses[selectedMajor].map((c) => (
                       <label key={c.id} className="class-option">
                         <input
                           type="radio"

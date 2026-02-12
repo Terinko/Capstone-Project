@@ -4,6 +4,12 @@ import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
 import { RequireAdmin } from "./Middleware/RequireAdmin.js";
 
+type MajorOption =
+  | "Software Engineering"
+  | "Computer Science"
+  | "Mechanical Engineering"
+  | "Industrial Engineering";
+
 interface ClassOption {
   id: string;
   label: string;
@@ -86,13 +92,13 @@ app.get("/courses", (req: Request, res: Response) => {
   res.send(MAJOR_CLASSES);
 })
 
-app.post("/courses", (req: Request, res: Response) => {
+/*app.post("/courses", (req: Request, res: Response) => {
   
 })
 
 app.post("/student", (req: Request, res: Response) => {
   
-})
+})*/
 
 /**
  * Global error handler:
