@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { supabase } from "../supabaseClient";
 import { saveSession } from "./Session";
 
@@ -8,27 +9,36 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
+interface ILoginInput {
+  email: string;
+  password: string;
+}
+
 const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ILoginInput>();
+
+  const onSubmit: SubmitHandler<ILoginInput> = async (data) => {
+    setServerError("");
     setLoading(true);
 
-    const fullEmail = `${email}@quinnipiac.edu`;
+    const fullEmail = `${data.email}@quinnipiac.edu`;
 
     try {
-      // We want to check both tables so that the user doesn't have to specify their type
-      const { data: studentData, error: studentError } = await supabase
+      // Check Student table
+      const { data: studentData } = await supabase
         .from("Student")
         .select("*")
         .eq("Student_Qu_Email", fullEmail)
-        .eq("Password", password)
+        .eq("Password", data.password)
         .single();
 
       if (studentData) {
@@ -40,20 +50,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
           userEmail: studentData.Student_Qu_Email,
         });
 
-        resetForm();
-        onClose();
-
-        //Navigate to student dashboard
+        handleClose();
         navigate("/studentdashboard");
         return;
       }
 
-      // Now check the admin table
-      const { data: facultyData, error: facultyError } = await supabase
+      // Check Faculty/Admin table
+      const { data: facultyData } = await supabase
         .from("Faculty_Admin")
         .select("*")
         .eq("Faculty_Qu_Email", fullEmail)
-        .eq("Password", password)
+        .eq("Password", data.password)
         .single();
 
       if (facultyData) {
@@ -65,8 +72,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
           userEmail: facultyData.Faculty_Qu_Email,
         });
 
-        resetForm();
-        onClose();
+        handleClose();
 
         const isAdmin =
           facultyData.Faculty_Qu_Email?.toLowerCase() ===
@@ -77,26 +83,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
         } else {
           navigate("/facultyAdmin");
         }
-
         return;
       }
 
       throw new Error("Invalid email or password");
     } catch (err: any) {
-      setError(err.message || "Invalid email or password");
+      setServerError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setEmail("");
-    setPassword("");
-    setError("");
-  };
-
   const handleClose = () => {
-    resetForm();
+    reset();
+    setServerError("");
     onClose();
   };
 
@@ -121,37 +121,45 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
             ></button>
           </div>
           <div className="modal-body">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit(onSubmit)}>
               <div className="mb-3">
                 <div className="input-group">
                   <input
                     type="text"
-                    className="form-control"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    className={`form-control ${errors.email ? "is-invalid" : ""}`}
                     placeholder="Quinnipiac E-Mail"
+                    {...register("email", { required: "Email is required" })}
                   />
                   <span className="input-group-text" id="basic-addon2">
                     @quinnipiac.edu
                   </span>
+                  {errors.email && (
+                    <div className="invalid-feedback">
+                      {errors.email.message}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="mb-3">
                 <input
                   type="password"
-                  className="form-control"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  className={`form-control ${errors.password ? "is-invalid" : ""}`}
                   placeholder="Password"
+                  {...register("password", {
+                    required: "Password is required",
+                  })}
                 />
+                {errors.password && (
+                  <div className="invalid-feedback">
+                    {errors.password.message}
+                  </div>
+                )}
               </div>
 
-              {error && (
+              {serverError && (
                 <div className="alert alert-danger" role="alert">
-                  {error}
+                  {serverError}
                 </div>
               )}
 

@@ -74,7 +74,7 @@ const Navbar: React.FC = () => {
             </li>
             <li className="nav-item">
               <button className="nav-btn" onClick={handleSignOut}>
-                Sign Out
+                Log Out
               </button>
             </li>
           </ul>

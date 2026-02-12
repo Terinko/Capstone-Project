@@ -8,7 +8,7 @@ import Navbar from "./Navbar";
 
 const API_KEY = import.meta.env.VITE_AIAPIKEY;
 const OPENROUTER_URL = import.meta.env.VITE_OPEN_ROUTER_URL;
-const MODEL_ID = import.meta.env.VITE_MODEL_ID; // Specifically for the free version
+const MODEL_ID = import.meta.env.VITE_MODEL_ID;
 
 const fetchWithExponentialBackoff = async (
   url: string,
