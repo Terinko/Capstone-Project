@@ -1,19 +1,38 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Footer from "./footer";
 import Navbar from "./Navbar";
 import "./AdminDashboard.css";
+import { loadSession } from "./Session";
+import EditCourseMappingModal from "./EditCourseMappingModal";
 
+/**
+ * Majors supported by the dashboard filter.
+ * Keeping this as a union helps prevent typos and ensures the dropdown stays in sync with the backend contract.
+ */
 type MajorFilter =
   | "Software Engineering"
   | "Computer Science"
   | "Mechanical Engineering"
   | "Industrial Engineering"
-  | "Civil Engineering";
+  | "Civil Engineering"
+  | "Engineering";
 
-type CompletionStatus = "Mapped" | "Unmapped"; // internal status
+/**
+ * A course row is either fully mapped or not.
+ * "Mapped" means both Skill + Competency mappings exist based on backend rules.
+ */
+type CompletionStatus = "Mapped" | "Unmapped";
 
+/**
+ * Filter control values for mapping completion.
+ */
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
 
+/**
+ * Row model expected from the API for the table.
+ * - skills: skill *descriptions*
+ * - competencies: competency *names*
+ */
 interface AdminCourseRow {
   id: number;
   course: string;
@@ -23,77 +42,149 @@ interface AdminCourseRow {
   competencies: string[];
 }
 
-const MOCK_ROWS: AdminCourseRow[] = [
-  {
-    id: 1,
-    course: "SER-210",
-    major: "Software Engineering",
-    completion: "Mapped",
-    skills: ["Skill 1", "Skill 2", "Skill 3"],
-    competencies: ["Competency 1", "Competency 2", "Competency 3"],
-  },
-  {
-    id: 2,
-    course: "SER-350",
-    major: "Software Engineering",
-    completion: "Mapped",
-    skills: ["Skill 1", "Skill 2", "Skill 3"],
-    competencies: ["Competency 1", "Competency 2", "Competency 3"],
-  },
-  {
-    id: 3,
-    course: "SER-491",
-    major: "Software Engineering",
-    completion: "Unmapped",
-    skills: ["Skill 1", "Skill 2"],
-    competencies: [],
-  },
-  {
-    id: 4,
-    course: "CSC-210",
-    major: "Computer Science",
-    completion: "Unmapped",
-    skills: [],
-    competencies: [],
-  },
-  {
-    id: 5,
-    course: "MER-240",
-    major: "Mechanical Engineering",
-    completion: "Mapped",
-    skills: ["Skill 1"],
-    competencies: ["Competency 1", "Competency 2"],
-  },
-];
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE) {
+  // Fail fast during development instead of silently making requests to "undefined".
+  throw new Error("VITE_API_BASE_URL is not defined");
+}
+
+/**
+ * Thin wrapper around fetch that:
+ * 1) Prepends the API base URL
+ * 2) Adds JSON headers
+ * 3) Adds session headers if logged in
+ * 4) Throws a useful error when requests fail
+ *
+ * Centralizing this makes every API call consistent and easier to debug.
+ */
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = loadSession();
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      // Session headers are used by your backend for authorization
+      ...(session && {
+        "x-user-id": String(session.userId),
+        "x-user-type": session.userType,
+      }),
+      // Allow callers to override/extend headers if needed
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    // Capture body to make debugging backend failures easier (e.g. RLS errors, route mismatches, etc.)
+    const text = await res.text();
+    console.error("API ERROR:", {
+      url: `${API_BASE}${path}`,
+      status: res.status,
+      body: text,
+    });
+
+    // Throw body text if present (often contains a JSON error message)
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+
+  return (await res.json()) as T;
+}
 
 const AdminDashboard: React.FC = () => {
+  /* ------------------------------ Filters ------------------------------ */
   const [majorFilter, setMajorFilter] = useState<MajorFilter>(
-    "Software Engineering"
+    "Software Engineering",
   );
   const [completionFilter, setCompletionFilter] =
     useState<CompletionFilter>("All");
 
-  // Filter the mock data (later this will be DB-driven)
-  const filteredRows = useMemo(() => {
-    return MOCK_ROWS.filter((row) => {
-      const matchesMajor = row.major === majorFilter;
-      const matchesCompletion =
-        completionFilter === "All" || row.completion === completionFilter;
-      return matchesMajor && matchesCompletion;
-    });
+  /* ------------------------------ Table state ------------------------------ */
+  const [rows, setRows] = useState<AdminCourseRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * When set, the modal opens and knows which course is being edited.
+   * Using a single object keeps the state together and avoids desync.
+   */
+  const [editing, setEditing] = useState<{ id: number; code: string } | null>(
+    null,
+  );
+
+  /**
+   * Incrementing refreshKey triggers a re-fetch.
+   * This is a simple, reliable pattern after saving edits in the modal.
+   */
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  /**
+   * Fetch course rows when:
+   * - the selected major changes
+   * - the completion filter changes
+   * - we explicitly refresh after saving
+   *
+   * Uses a cancellation flag to prevent setting state after unmount / rapid changes.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Query params are built here to keep the fetch URL clean and predictable.
+        const params = new URLSearchParams();
+        params.set("major", majorFilter);
+        params.set("status", completionFilter);
+
+        const data = await apiFetch<AdminCourseRow[]>(
+          `/api/admin/courses?${params.toString()}`,
+        );
+
+        if (!cancelled) setRows(data);
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load courses");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [majorFilter, completionFilter, refreshKey]);
+
+  /**
+   * If the user changes filters while the edit modal is open,
+   * close the modal to avoid editing a row that may no longer be visible/valid.
+   */
+  useEffect(() => {
+    setEditing(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [majorFilter, completionFilter]);
+
+  /**
+   * Placeholder for future client-side filtering/sorting without reworking render logic.
+   * Right now rows are already filtered server-side based on major/status.
+   */
+  const filteredRows = useMemo(() => rows, [rows]);
 
   return (
     <div className="admin-dashboard">
       <Navbar />
+
       <div className="admin-content">
-        {/* Title & subtitle */}
+        {/* ------------------------------ Header ------------------------------ */}
         <section className="admin-header">
           <h1 className="admin-title">Admin Dashboard</h1>
           <p className="admin-subtitle">Everything you need, in one place.</p>
         </section>
 
-        {/* Filter row */}
+        {/* ------------------------------ Filters ------------------------------ */}
         <section className="admin-filter-bar">
           <div className="filter-left">
             <span className="filter-icon" aria-hidden="true">
@@ -121,6 +212,7 @@ const AdminDashboard: React.FC = () => {
                   Industrial Engineering
                 </option>
                 <option value="Civil Engineering">Civil Engineering</option>
+                <option value="Engineering">Engineering</option>
               </select>
             </div>
 
@@ -144,72 +236,114 @@ const AdminDashboard: React.FC = () => {
           </div>
         </section>
 
-        {/* Table card */}
-        <section className="admin-table-card">
-          <div className="admin-table">
-            {/* Header row */}
-            <div className="admin-table-row admin-table-header">
-              <div className="admin-cell admin-cell-course">Course</div>
-              <div className="admin-cell admin-cell-skills">Skills</div>
-              <div className="admin-cell admin-cell-competencies">
-                Competencies
-              </div>
+        {/* ------------------------------ Loading / Error States ------------------------------ */}
+        {loading && (
+          <section className="admin-table-card">
+            <div className="muted" style={{ padding: 16 }}>
+              Loading courses…
             </div>
+          </section>
+        )}
 
-            {/* Body rows */}
-            {filteredRows.map((row) => (
-              <div className="admin-table-row" key={row.id}>
-                <div className="admin-cell admin-cell-course">{row.course}</div>
+        {error && (
+          <section className="admin-table-card">
+            <div style={{ padding: 16 }}>
+              <div style={{ marginBottom: 8 }}>Couldn’t load courses.</div>
+              <div className="muted">{error}</div>
+            </div>
+          </section>
+        )}
 
-                <div className="admin-cell admin-cell-skills">
-                  {row.skills.length > 0 ? (
-                    <ul>
-                      {row.skills.map((skill, idx) => (
-                        <li key={idx}>{skill}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="muted">No skills mapped yet</span>
-                  )}
-                </div>
-
+        {/* ------------------------------ Main Table ------------------------------ */}
+        {!loading && !error && (
+          <section className="admin-table-card">
+            <div className="admin-table">
+              {/* Table header row */}
+              <div className="admin-table-row admin-table-header">
+                <div className="admin-cell admin-cell-course">Course</div>
+                <div className="admin-cell admin-cell-skills">Skills</div>
                 <div className="admin-cell admin-cell-competencies">
-                  <div className="competency-content">
-                    {row.competencies.length > 0 ? (
+                  Competencies
+                </div>
+              </div>
+
+              {/* Data rows */}
+              {filteredRows.map((row) => (
+                <div className="admin-table-row" key={row.id}>
+                  <div className="admin-cell admin-cell-course">
+                    {row.course}
+                  </div>
+
+                  {/* Skills display: show descriptions, or a helpful empty state */}
+                  <div className="admin-cell admin-cell-skills">
+                    {row.skills.length > 0 ? (
                       <ul>
-                        {row.competencies.map((c, idx) => (
-                          <li key={idx}>{c}</li>
+                        {row.skills.map((skill, idx) => (
+                          <li key={idx}>{skill}</li>
                         ))}
                       </ul>
                     ) : (
-                      <span className="muted">No competencies mapped yet</span>
+                      <span className="muted">No skills mapped yet</span>
                     )}
+                  </div>
 
-                    {/* Edit icon – visual placeholder for future modal or page */}
-                    <button
-                      type="button"
-                      className="edit-icon-button"
-                      aria-label={`Edit mapping for ${row.course}`}
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                    </button>
+                  {/* Competencies + edit button */}
+                  <div className="admin-cell admin-cell-competencies">
+                    <div className="competency-content">
+                      {row.competencies.length > 0 ? (
+                        <ul>
+                          {row.competencies.map((c, idx) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="muted">
+                          No competencies mapped yet
+                        </span>
+                      )}
+
+                      {/* Opens a single shared modal with the selected course context */}
+                      <button
+                        type="button"
+                        className="edit-icon-button"
+                        aria-label={`Edit mapping for ${row.course}`}
+                        onClick={() =>
+                          setEditing({ id: row.id, code: row.course })
+                        }
+                      >
+                        <i className="bi bi-pencil-square"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {filteredRows.length === 0 && (
-              <div className="admin-table-row admin-empty-row">
-                <div className="admin-cell" style={{ gridColumn: "1 / 4" }}>
-                  <span className="muted">
-                    No courses match the selected filters.
-                  </span>
+              {/* One modal instance: controlled by editing state */}
+              <EditCourseMappingModal
+                isOpen={editing !== null}
+                courseId={editing?.id ?? 0}
+                courseCode={editing?.code ?? ""}
+                onClose={() => setEditing(null)}
+                // Trigger a refetch after saving to keep the table accurate
+                onSaved={() => setRefreshKey((k) => k + 1)}
+                apiFetch={apiFetch}
+              />
+
+              {/* Empty table message */}
+              {filteredRows.length === 0 && (
+                <div className="admin-table-row admin-empty-row">
+                  <div className="admin-cell" style={{ gridColumn: "1 / 4" }}>
+                    <span className="muted">
+                      No courses match the selected filters.
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </section>
+              )}
+            </div>
+          </section>
+        )}
       </div>
+
       <Footer />
     </div>
   );

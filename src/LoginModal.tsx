@@ -79,6 +79,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
           "sample.admin@quinnipiac.edu";
 
         if (isAdmin) {
+          // Go to admin dashboard
           navigate("/adminDashboard");
         } else {
           navigate("/facultyAdmin");
