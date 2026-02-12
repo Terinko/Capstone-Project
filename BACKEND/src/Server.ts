@@ -4,6 +4,33 @@ import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
 import { RequireAdmin } from "./Middleware/RequireAdmin.js";
 
+interface ClassOption {
+  id: string;
+  label: string;
+  courseId?: string;
+}
+const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
+  { id: "1", label: "SER-491", courseId: "SER-491" },
+  { id: "2", label: "SER-340", courseId: "SER-340" },
+  { id: "3", label: "SER-341", courseId: "SER-341" },
+  { id: "4", label: "SER-325", courseId: "SER-325" },
+  { id: "5", label: "SER-350", courseId: "SER-350" },
+  { id: "6", label: "SER-330", courseId: "SER-330" },
+  { id: "7", label: "SER-210", courseId: "SER-210" },
+  { id: "8", label: "SER-492", courseId: "SER-492" },
+  { id: "9", label: "SER-225", courseId: "SER-225" },
+  { id: "10", label: "SER-375", courseId: "SER-375" },
+  { id: "11", label: "SER-120", courseId: "SER-120" },
+  { id: "12", label: "SER-305", courseId: "SER-305" },
+];
+
+const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
+  "Software Engineering": SOFTWARE_ENGINEERING_CLASSES,
+  "Computer Science": [],
+  "Mechanical Engineering": [],
+  "Industrial Engineering": [],
+};
+
 /**
  * Express app instance for the Admin Course Management backend.
  * This file is intentionally kept small:
@@ -51,6 +78,21 @@ app.use("/api/admin", RequireAdmin, adminCoursesRouter);
  * Useful to confirm the server is reachable and the process is alive.
  */
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
+
+/**
+ * Courses endpoints
+ */
+app.get("/courses", (req: Request, res: Response) => {
+  res.send(MAJOR_CLASSES);
+})
+
+app.post("/courses", (req: Request, res: Response) => {
+  
+})
+
+app.post("/student", (req: Request, res: Response) => {
+  
+})
 
 /**
  * Global error handler:
