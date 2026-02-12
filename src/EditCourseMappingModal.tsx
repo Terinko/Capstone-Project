@@ -201,7 +201,7 @@ export default function EditCourseMappingModal({
    * Confirmation is required because this affects all courses.
    */
   async function handleDeleteSkill(skillId: number) {
-    if (!confirm("Delete this skill everywhere?")) return;
+    //if (!confirm("Delete this skill everywhere?")) return;
 
     await apiFetch(`/api/admin/skills/${skillId}`, { method: "DELETE" });
     setSelectedSkillIds((prev) => prev.filter((id) => id !== skillId));
