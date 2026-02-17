@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { supabase } from "../supabaseClient";
 import { saveSession } from "./Session";
 
 interface CreateAccountModalProps {
@@ -19,6 +18,12 @@ interface IFormInput {
   confirmPassword: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE) {
+  throw new Error("VITE_API_BASE_URL is not defined");
+}
+
 const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   showModal,
   onClose,
@@ -26,9 +31,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const AUTOFACULTY = false;
 
-  // Initialize React Hook Form
   const {
     register,
     handleSubmit,
@@ -47,9 +50,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     },
   });
 
-  // Watch userType to conditionally render/validate the Major field
   const userType = watch("userType");
-  // Watch password to validate confirmPassword against it
   const password = watch("password");
 
   const onSubmit: SubmitHandler<IFormInput> = async (data) => {
@@ -57,75 +58,38 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
     setLoading(true);
 
     try {
-      if (data.userType === "Student") {
-        const { data: existingUser } = await supabase
-          .from("Student")
-          .select("*")
-          .eq("Student_Qu_Email", data.email + "@quinnipiac.edu")
-          .single();
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userType: data.userType,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          major: data.major,
+          password: data.password,
+          // confirmPassword is intentionally omitted — frontend-only concern
+        }),
+      });
 
-        if (existingUser) {
-          throw new Error("An account with this email already exists");
-        }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create account");
+      }
 
-        const { data: newData, error } = await supabase
-          .from("Student")
-          .insert({
-            Student_Qu_Email: data.email + "@quinnipiac.edu",
-            Password: data.password,
-            FirstName: data.firstName,
-            LastName: data.lastName,
-            Major: data.major,
-          })
-          .select()
-          .single();
+      const session = await res.json();
 
-        if (error) throw error;
+      saveSession({
+        userId: session.userId,
+        userType: session.userType,
+        userEmail: session.userEmail,
+      });
 
-        console.log("Student account created:", newData);
+      handleClose();
 
-        saveSession({
-          userId: newData.Student_Id,
-          userType: "Student",
-          userEmail: newData.Student_Qu_Email,
-        });
-
-        handleClose();
+      if (session.userType === "Student") {
         navigate("/studentdashboard");
       } else {
-        const { data: existingUser } = await supabase
-          .from("Faculty_Admin")
-          .select("*")
-          .eq("Faculty_Qu_Email", data.email + "@quinnipiac.edu")
-          .single();
-
-        if (existingUser) {
-          throw new Error("An account with this email already exists");
-        }
-
-        const { data: newData, error } = await supabase
-          .from("Faculty_Admin")
-          .insert({
-            Type: AUTOFACULTY,
-            Faculty_Qu_Email: data.email + "@quinnipiac.edu",
-            Password: data.password,
-            FirstName: data.firstName,
-            LastName: data.lastName,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        console.log("Faculty/Admin account created:", newData);
-
-        saveSession({
-          userId: newData.Faculty_Id,
-          userType: "Faculty/Administrator",
-          userEmail: newData.Faculty_Qu_Email,
-        });
-
-        handleClose();
         navigate("/facultyAdmin");
       }
     } catch (err: any) {
@@ -136,7 +100,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   };
 
   const handleClose = () => {
-    reset(); // Clear form errors and values
+    reset();
     setServerError("");
     onClose();
   };
