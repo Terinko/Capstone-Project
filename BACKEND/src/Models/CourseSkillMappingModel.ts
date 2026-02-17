@@ -56,9 +56,3 @@ export async function deleteMappingsBySkillId(skillId: number) {
 
   if (del.error) throw new Error(del.error.message);
 }
-
-// check if user is loged in
-
-export async function login(params:type) {
-  
-}
