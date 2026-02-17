@@ -2,7 +2,6 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
-import { RequireAdmin } from "./Middleware/RequireAdmin.js";
 import { getAllCourses } from "./Models/CoursesModel.js";
 import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
@@ -17,7 +16,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_API_KEY) {
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-app.use("/api/admin", RequireAdmin, adminCoursesRouter);
+app.use("/api/admin", adminCoursesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth", createAccountRouter);
 
