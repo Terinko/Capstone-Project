@@ -1,10 +1,24 @@
-// src/pages/dashboard.tsx
-import React, { useState, type ChangeEvent, type FormEvent } from "react";
+// src/facultyDashboard.tsx
+import React, {
+  useState,
+  useEffect,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import Footer from "./footer";
 import "./FacultyDashboard.css";
 import "./StudentDashboard.css";
 import Navbar from "./Navbar";
 import CourseCard from "./components/CourseCard";
+
+/* ---------- Types & Data from Student Dashboard ------------------------- */
+type MajorOption = string; // Relaxed type to allow dynamic DB values
+
+interface ClassOption {
+  id: string;
+  label: string;
+  courseId?: string;
+}
 
 /* ---------- Types ------------------------------------------------------- */
 interface Course {
@@ -17,15 +31,21 @@ interface Course {
 /* ---------- Component ---------------------------------------------------- */
 const FacultyDashboard: React.FC = () => {
   /* ---------- State -----------------------------------------------------*/
+  const [selectedMajor, setSelectedMajor] = useState<MajorOption>(
+    "Software Engineering",
+  );
   const [courseName, setCourseName] = useState("");
   const [courseSkills, setCourseSkills] = useState("");
   const [courseCompetencies, setCourseCompetencies] = useState("");
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [majorClasses, setMajorClasses] = useState<Record<
+    string,
+    ClassOption[]
+  > | null>(null);
 
   /* ---------- Helpers ---------------------------------------------------*/
-  // simple incremental id generator – works fine for a demo
-  let nextId = Math.max(...courses.map((c) => c.id)) + 1;
+  let nextId = Math.max(...courses.map((c) => c.id), 0) + 1;
 
   const addCourse = (e: FormEvent) => {
     e.preventDefault();
@@ -39,10 +59,38 @@ const FacultyDashboard: React.FC = () => {
         competencies: courseCompetencies.trim(),
       },
     ]);
+    // Reset form
     setCourseName("");
     setCourseSkills("");
     setCourseCompetencies("");
   };
+
+  const handleMajorChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedMajor(e.target.value as MajorOption);
+    setCourseName(""); // Reset course selection when major changes
+  };
+
+  // FIX: Wrap fetch in useEffect to prevent infinite loops
+  useEffect(() => {
+    const fetchMajorClasses = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/courses");
+        const result = await response.json();
+        setMajorClasses(result);
+
+        // Optional: If the currently selected major isn't in the fetched list, select the first one
+        const keys = Object.keys(result);
+        if (keys.length > 0 && !keys.includes(selectedMajor)) {
+          setSelectedMajor(keys[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch majors:", err);
+      }
+    };
+
+    fetchMajorClasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   /* ---------- Render ---------------------------------------------------- */
   return (
@@ -54,29 +102,82 @@ const FacultyDashboard: React.FC = () => {
         <section className="dashboard-title-block">
           <h1 className="dashboard-title">Faculty Dashboard</h1>
           <p className="dashboard-subtitle">
-            Everything you need, in one place.
+            Manage course mappings and competencies.
           </p>
         </section>
 
         {/* ─────────────────────── Courses ─────────────────────── */}
         <section className="card-section">
           <div className="card-surface">
-            <h2>Courses</h2>
+            <h2>Add Course Mapping</h2>
             <form onSubmit={addCourse} style={styles.form}>
-              <input
-                className="textbox"
-                type="text"
-                placeholder="Course name"
-                value={courseName}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setCourseName(e.target.value)
-                }
-                required
-                style={styles.input}
-              />
+              {/* Major Selection */}
+              <div style={{ width: "100%" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "0.5rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Select Major:
+                </label>
+                {majorClasses ? (
+                  <select
+                    className="textbox"
+                    value={selectedMajor}
+                    onChange={handleMajorChange}
+                    style={styles.input}
+                  >
+                    {Object.keys(majorClasses).map((major) => (
+                      <option key={major} value={major}>
+                        {major}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-muted">Loading majors...</p>
+                )}
+              </div>
+
+              {/* Course Selection (Radio Buttons) */}
+              <div style={{ width: "100%", margin: "1rem 0" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "0.5rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Select Course:
+                </label>
+                {majorClasses &&
+                majorClasses[selectedMajor] &&
+                majorClasses[selectedMajor].length > 0 ? (
+                  <div className="class-grid">
+                    {majorClasses[selectedMajor].map((c) => (
+                      <label key={c.id} className="class-option">
+                        <input
+                          type="radio"
+                          name="courseSelection"
+                          value={c.label}
+                          checked={courseName === c.label}
+                          onChange={(e) => setCourseName(e.target.value)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted" style={{ fontStyle: "italic" }}>
+                    No courses available for this major.
+                  </p>
+                )}
+              </div>
+
               <textarea
                 className="textbox"
-                placeholder="Skills"
+                placeholder="Skills (e.g., React, SQL, Agile)"
                 value={courseSkills}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                   setCourseSkills(e.target.value)
@@ -85,14 +186,18 @@ const FacultyDashboard: React.FC = () => {
               />
               <textarea
                 className="textbox"
-                placeholder="Competencies"
+                placeholder="Competencies (e.g., Problem Solving, Teamwork)"
                 value={courseCompetencies}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                   setCourseCompetencies(e.target.value)
                 }
                 style={{ ...styles.input, height: 60 }}
               />
-              <button type="submit" style={styles.button}>
+              <button
+                type="submit"
+                style={{ ...styles.button, opacity: courseName ? 1 : 0.6 }}
+                disabled={!courseName}
+              >
                 Add Course
               </button>
             </form>
@@ -100,21 +205,27 @@ const FacultyDashboard: React.FC = () => {
         </section>
         <section className="card-section">
           <div className="card-surface">
-            {courses.map((c) => (
-              <div>
-                <CourseCard
-                  id={c.id}
-                  name={c.name}
-                  skills={[c.skills ?? ""]}
-                  competencies={[c.competencies ?? ""]}
-                  deleteMethod={() =>
-                    setCourses((prev) =>
-                      prev.filter((pc) => pc.name !== c.name)
-                    )
-                  }
-                />
-              </div>
-            ))}
+            {courses.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#666" }}>
+                No courses added yet. Use the form above to map a course.
+              </p>
+            ) : (
+              courses.map((c) => (
+                <div key={c.id}>
+                  <CourseCard
+                    id={c.id}
+                    name={c.name}
+                    skills={[c.skills ?? ""]}
+                    competencies={[c.competencies ?? ""]}
+                    deleteMethod={() =>
+                      setCourses((prev) =>
+                        prev.filter((pc) => pc.name !== c.name),
+                      )
+                    }
+                  />
+                </div>
+              ))
+            )}
           </div>
         </section>
       </main>
@@ -146,6 +257,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     alignItems: "center",
     gap: 10,
+    width: "100%",
   },
 
   input: {
@@ -154,36 +266,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     border: "1px solid #ccc",
     width: "100%",
+    boxSizing: "border-box",
   },
   button: {
-    padding: "6px 12px",
+    padding: "8px 16px",
     background: "#0069d9",
     color: "#fff",
     border: "none",
     borderRadius: 4,
     cursor: "pointer",
-  },
-
-  list: { marginTop: 20, listStyle: "none", paddingLeft: 0 },
-  listItem: {
-    padding: "8px 12px",
-    marginBottom: 6,
-    background: "#fff",
-    borderRadius: 4,
-    border: "1px solid #ddd",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  deleteButton: {
-    padding: "2px 8px",
-    fontSize: 12,
-    background: "#dc3545",
-    color: "#fff",
-    border: "none",
-    borderRadius: 4,
-    cursor: "pointer",
+    marginTop: "10px",
   },
 };
 

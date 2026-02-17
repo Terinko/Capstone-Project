@@ -8,58 +8,12 @@ import Navbar from "./Navbar";
 
 const API_KEY = import.meta.env.VITE_AIAPIKEY;
 const OPENROUTER_URL = import.meta.env.VITE_OPEN_ROUTER_URL;
-const MODEL_ID = import.meta.env.VITE_MODEL_ID; // Specifically for the free version
-
-const fetchWithExponentialBackoff = async (
-  url: string,
-  payload: any,
-  maxRetries = 5,
-) => {
-  let delay = 1000;
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429 || response.status >= 500) {
-          throw new Error(`HTTP error ${response.status}`);
-        } else {
-          const errorResult = await response.json();
-          throw new Error(
-            errorResult?.error?.message || `HTTP error ${response.status}`,
-          );
-        }
-      }
-
-      const result = await response.json();
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!text) {
-        throw new Error("No valid content received from API.");
-      }
-
-      return result;
-    } catch (error: any) {
-      console.error(`Attempt ${i + 1} failed: ${error.message}`);
-      if (i === maxRetries - 1) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay *= 2;
-    }
-  }
-};
+const MODEL_ID = import.meta.env.VITE_MODEL_ID;
 
 const getVal = (obj: any, key: string) => {
   if (!obj) return undefined;
   if (obj[key] !== undefined) return obj[key];
-  // Check lowercase match
   if (obj[key.toLowerCase()] !== undefined) return obj[key.toLowerCase()];
-  // Check uppercase match (rare but possible)
   if (obj[key.toUpperCase()] !== undefined) return obj[key.toUpperCase()];
   return undefined;
 };
@@ -71,9 +25,9 @@ type MajorOption =
   | "Industrial Engineering";
 
 interface ClassOption {
-  id: string;
-  label: string;
-  courseId?: string;
+  id: string; // This is now the DB Course_Id (as string)
+  label: string; // This is the Course_Code
+  courseId?: string; // This is the Course_Code (kept for compatibility)
 }
 
 interface Skill {
@@ -82,29 +36,6 @@ interface Skill {
   Type: boolean;
   Description: string;
 }
-
-const SOFTWARE_ENGINEERING_CLASSES: ClassOption[] = [
-  // UPDATE ALL items to use the dash format "SER-XXX"
-  { id: "1", label: "SER-491", courseId: "SER-491" },
-  { id: "2", label: "SER-340", courseId: "SER-340" },
-  { id: "3", label: "SER-341", courseId: "SER-341" },
-  { id: "4", label: "SER-325", courseId: "SER-325" },
-  { id: "5", label: "SER-350", courseId: "SER-350" },
-  { id: "6", label: "SER-330", courseId: "SER-330" },
-  { id: "7", label: "SER-210", courseId: "SER-210" },
-  { id: "8", label: "SER-492", courseId: "SER-492" },
-  { id: "9", label: "SER-225", courseId: "SER-225" },
-  { id: "10", label: "SER-375", courseId: "SER-375" },
-  { id: "11", label: "SER-120", courseId: "SER-120" },
-  { id: "12", label: "SER-305", courseId: "SER-305" },
-];
-
-const MAJOR_CLASSES: Record<MajorOption, ClassOption[]> = {
-  "Software Engineering": SOFTWARE_ENGINEERING_CLASSES,
-  "Computer Science": [],
-  "Mechanical Engineering": [],
-  "Industrial Engineering": [],
-};
 
 const StudentDashboard: React.FC = () => {
   const [major, setMajor] = useState<MajorOption>("Software Engineering");
@@ -118,52 +49,58 @@ const StudentDashboard: React.FC = () => {
 
   const [showRawSkills, setShowRawSkills] = useState<boolean>(false);
 
-  const availableClasses = MAJOR_CLASSES[major];
+  const [majorClasses, setMajorClasses] = useState<Record<
+    MajorOption,
+    ClassOption[]
+  > | null>(null);
 
+  // 1. FETCH CLASSES ON MOUNT
+  // This replaces the direct function call that caused loops
+  useEffect(() => {
+    const fetchMajorClasses = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/courses");
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        const result = await response.json();
+        setMajorClasses(result);
+      } catch (err) {
+        console.error("Failed to load classes:", err);
+      }
+    };
+
+    fetchMajorClasses();
+  }, []); // Run once on mount
+
+  const availableClasses =
+    majorClasses && majorClasses[major] ? majorClasses[major] : [];
+
+  // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
   useEffect(() => {
     const loadSkillsForClasses = async () => {
+      // If no classes available yet, clear skills and wait
+      if (!availableClasses || availableClasses.length === 0) {
+        setCourseSkills({});
+        return;
+      }
+
       setIsLoadingSkills(true);
 
       try {
-        // 1. Get the course codes (now "SER-491") from the updated config
-        const courseCodes = availableClasses
-          .map((c) => c.courseId)
-          .filter(Boolean) as string[];
+        // OPTIMIZATION: Use the numeric IDs provided by the backend directly.
+        // The backend sends { id: "15", ... } where "15" is the Course_Id.
+        const validNumericIds = availableClasses
+          .map((c) => Number(c.id))
+          .filter((n) => !isNaN(n) && n > 0);
 
-        if (courseCodes.length === 0) {
+        if (validNumericIds.length === 0) {
           setCourseSkills({});
           setIsLoadingSkills(false);
           return;
         }
 
-        // 2. LOOKUP STEP: Exchange "SER-491" for the numeric Course_Id
-        const { data: coursesData, error: coursesError } = await supabase
-          .from("Courses")
-          .select("Course_Id, Course_Code")
-          .in("Course_Code", courseCodes);
-
-        if (coursesError) throw coursesError;
-
-        if (!coursesData || coursesData.length === 0) {
-          console.warn("No courses found in DB matching:", courseCodes);
-          setCourseSkills({});
-          return;
-        }
-
-        // 3. Prepare the list of Numeric IDs to fetch mappings
-        const courseIdMap: Record<number, string> = {};
-        const validNumericIds: number[] = [];
-
-        coursesData.forEach((c) => {
-          const cId = getVal(c, "Course_Id");
-          const cCode = getVal(c, "Course_Code");
-          if (cId) {
-            validNumericIds.push(cId);
-            courseIdMap[cId] = cCode; // Map ID 15 -> "SER-491"
-          }
-        });
-
-        // 4. Fetch Mappings using the Numeric IDs
+        // Fetch Mappings directly using IDs (Skip the extra "Courses" table lookup)
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
@@ -176,7 +113,7 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        // 5. Fetch Skills
+        // Fetch Skills Details
         const skillIds = [
           ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
         ];
@@ -188,8 +125,12 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
-        // 6. Build the final map
-        const skillsLookup: Record<string, Skill[]> = {};
+        // Create a lookup for mapping back to the "Code" (e.g., SER-491)
+        // The dashboard uses the Code string as the key in courseSkills
+        const idToCodeMap: Record<number, string> = {};
+        availableClasses.forEach((c) => {
+          idToCodeMap[Number(c.id)] = c.courseId!; // c.courseId is "SER-491"
+        });
 
         const allSkills = (skillsData || []).map((s) => ({
           Skill_Id: getVal(s, "Skill_Id"),
@@ -198,12 +139,14 @@ const StudentDashboard: React.FC = () => {
           Description: getVal(s, "Description"),
         }));
 
+        // Build the final map keyed by Course Code
+        const skillsLookup: Record<string, Skill[]> = {};
+
         mappingsData.forEach((mapping) => {
           const mCourseId = getVal(mapping, "Course_Id");
           const mSkillId = getVal(mapping, "Skill_Id");
 
-          // Convert Numeric ID back to "SER-491" so the dashboard knows where to put it
-          const courseCodeStr = courseIdMap[mCourseId];
+          const courseCodeStr = idToCodeMap[mCourseId];
 
           if (courseCodeStr) {
             const skillDetail = allSkills.find(
@@ -213,7 +156,6 @@ const StudentDashboard: React.FC = () => {
               if (!skillsLookup[courseCodeStr]) {
                 skillsLookup[courseCodeStr] = [];
               }
-              // Avoid duplicates
               if (
                 !skillsLookup[courseCodeStr].some(
                   (s) => s.Skill_Id === skillDetail.Skill_Id,
@@ -237,7 +179,7 @@ const StudentDashboard: React.FC = () => {
     };
 
     loadSkillsForClasses();
-  }, [major]);
+  }, [major, majorClasses]); // Re-run if major changes or if class list loads
 
   const handleClassToggle = (id: string) => {
     setSelectedClasses((prev) =>
@@ -265,7 +207,7 @@ const StudentDashboard: React.FC = () => {
       `;
 
       const payload = {
-        model: MODEL_ID, // Uses google/gemma-3-27b-it:free
+        model: MODEL_ID,
         messages: [{ role: "user", content: prompt }],
       };
 
@@ -283,8 +225,6 @@ const StudentDashboard: React.FC = () => {
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
 
       const result = await response.json();
-
-      // OpenRouter returns results in result.choices[0].message.content
       const text = result.choices?.[0]?.message?.content || "";
 
       const formattedBullets = text
@@ -432,8 +372,7 @@ const StudentDashboard: React.FC = () => {
                   className="text-muted"
                   style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
                 >
-                  Class selection will be available for this major soon. Try
-                  Software Engineering to see an example.
+                  No classes found for this major.
                 </p>
               )}
             </div>

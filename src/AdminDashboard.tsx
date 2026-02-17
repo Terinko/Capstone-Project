@@ -5,38 +5,13 @@ import "./AdminDashboard.css";
 import { loadSession } from "./Session";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 
-/**
- * Majors supported by the dashboard filter.
- * Keeping this as a union helps prevent typos and ensures the dropdown stays in sync with the backend contract.
- */
-type MajorFilter =
-  | "Software Engineering"
-  | "Computer Science"
-  | "Mechanical Engineering"
-  | "Industrial Engineering"
-  | "Civil Engineering"
-  | "Engineering";
-
-/**
- * A course row is either fully mapped or not.
- * "Mapped" means both Skill + Competency mappings exist based on backend rules.
- */
 type CompletionStatus = "Mapped" | "Unmapped";
-
-/**
- * Filter control values for mapping completion.
- */
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
 
-/**
- * Row model expected from the API for the table.
- * - skills: skill *descriptions*
- * - competencies: competency *names*
- */
 interface AdminCourseRow {
   id: number;
   course: string;
-  major: MajorFilter;
+  major: string;
   completion: CompletionStatus;
   skills: string[];
   competencies: string[];
@@ -45,86 +20,80 @@ interface AdminCourseRow {
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 if (!API_BASE) {
-  // Fail fast during development instead of silently making requests to "undefined".
   throw new Error("VITE_API_BASE_URL is not defined");
 }
 
-/**
- * Thin wrapper around fetch that:
- * 1) Prepends the API base URL
- * 2) Adds JSON headers
- * 3) Adds session headers if logged in
- * 4) Throws a useful error when requests fail
- *
- * Centralizing this makes every API call consistent and easier to debug.
- */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = loadSession();
-
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      // Session headers are used by your backend for authorization
       ...(session && {
         "x-user-id": String(session.userId),
         "x-user-type": session.userType,
       }),
-      // Allow callers to override/extend headers if needed
       ...(init?.headers ?? {}),
     },
   });
 
   if (!res.ok) {
-    // Capture body to make debugging backend failures easier (e.g. RLS errors, route mismatches, etc.)
     const text = await res.text();
-    console.error("API ERROR:", {
-      url: `${API_BASE}${path}`,
-      status: res.status,
-      body: text,
-    });
-
-    // Throw body text if present (often contains a JSON error message)
     throw new Error(text || `Request failed: ${res.status}`);
   }
-
   return (await res.json()) as T;
 }
 
 const AdminDashboard: React.FC = () => {
   /* ------------------------------ Filters ------------------------------ */
-  const [majorFilter, setMajorFilter] = useState<MajorFilter>(
+  const [majorFilter, setMajorFilter] = useState<string>(
     "Software Engineering",
   );
   const [completionFilter, setCompletionFilter] =
     useState<CompletionFilter>("All");
+
+  // DYNAMIC: Stores majors fetched from the DB
+  const [availableMajors, setAvailableMajors] = useState<string[]>([]);
 
   /* ------------------------------ Table state ------------------------------ */
   const [rows, setRows] = useState<AdminCourseRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * When set, the modal opens and knows which course is being edited.
-   * Using a single object keeps the state together and avoids desync.
-   */
   const [editing, setEditing] = useState<{ id: number; code: string } | null>(
     null,
   );
-
-  /**
-   * Incrementing refreshKey triggers a re-fetch.
-   * This is a simple, reliable pattern after saving edits in the modal.
-   */
   const [refreshKey, setRefreshKey] = useState(0);
 
   /**
-   * Fetch course rows when:
-   * - the selected major changes
-   * - the completion filter changes
-   * - we explicitly refresh after saving
-   *
-   * Uses a cancellation flag to prevent setting state after unmount / rapid changes.
+   * 1. FETCH MAJORS ON LOAD
+   * Queries the backend to see what Majors actually exist in the DB.
+   */
+  useEffect(() => {
+    const fetchMajors = async () => {
+      try {
+        // We use the public /courses endpoint which groups courses by Major
+        const data = await apiFetch<Record<string, any>>("/courses");
+        const dynamicMajors = Object.keys(data);
+
+        if (dynamicMajors.length > 0) {
+          setAvailableMajors(dynamicMajors);
+
+          // If the default filter isn't in the list, switch to the first available one
+          if (!dynamicMajors.includes(majorFilter)) {
+            setMajorFilter(dynamicMajors[0]);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load majors list:", e);
+      }
+    };
+    fetchMajors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * 2. FETCH ROWS WHEN FILTERS CHANGE
    */
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +103,6 @@ const AdminDashboard: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Query params are built here to keep the fetch URL clean and predictable.
         const params = new URLSearchParams();
         params.set("major", majorFilter);
         params.set("status", completionFilter);
@@ -158,19 +126,10 @@ const AdminDashboard: React.FC = () => {
     };
   }, [majorFilter, completionFilter, refreshKey]);
 
-  /**
-   * If the user changes filters while the edit modal is open,
-   * close the modal to avoid editing a row that may no longer be visible/valid.
-   */
   useEffect(() => {
     setEditing(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [majorFilter, completionFilter]);
 
-  /**
-   * Placeholder for future client-side filtering/sorting without reworking render logic.
-   * Right now rows are already filtered server-side based on major/status.
-   */
   const filteredRows = useMemo(() => rows, [rows]);
 
   return (
@@ -178,13 +137,11 @@ const AdminDashboard: React.FC = () => {
       <Navbar />
 
       <div className="admin-content">
-        {/* ------------------------------ Header ------------------------------ */}
         <section className="admin-header">
           <h1 className="admin-title">Admin Dashboard</h1>
           <p className="admin-subtitle">Everything you need, in one place.</p>
         </section>
 
-        {/* ------------------------------ Filters ------------------------------ */}
         <section className="admin-filter-bar">
           <div className="filter-left">
             <span className="filter-icon" aria-hidden="true">
@@ -195,24 +152,23 @@ const AdminDashboard: React.FC = () => {
               <label className="filter-label" htmlFor="major-select">
                 Select Major:
               </label>
+
+              {/* DYNAMIC SELECT: No hardcoded options here */}
               <select
                 id="major-select"
                 className="filter-select"
                 value={majorFilter}
-                onChange={(e) => setMajorFilter(e.target.value as MajorFilter)}
+                onChange={(e) => setMajorFilter(e.target.value)}
               >
-                <option value="Software Engineering">
-                  Software Engineering
-                </option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Mechanical Engineering">
-                  Mechanical Engineering
-                </option>
-                <option value="Industrial Engineering">
-                  Industrial Engineering
-                </option>
-                <option value="Civil Engineering">Civil Engineering</option>
-                <option value="Engineering">Engineering</option>
+                {availableMajors.length > 0 ? (
+                  availableMajors.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))
+                ) : (
+                  <option>Loading...</option>
+                )}
               </select>
             </div>
 
@@ -236,7 +192,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         </section>
 
-        {/* ------------------------------ Loading / Error States ------------------------------ */}
         {loading && (
           <section className="admin-table-card">
             <div className="muted" style={{ padding: 16 }}>
@@ -254,11 +209,9 @@ const AdminDashboard: React.FC = () => {
           </section>
         )}
 
-        {/* ------------------------------ Main Table ------------------------------ */}
         {!loading && !error && (
           <section className="admin-table-card">
             <div className="admin-table">
-              {/* Table header row */}
               <div className="admin-table-row admin-table-header">
                 <div className="admin-cell admin-cell-course">Course</div>
                 <div className="admin-cell admin-cell-skills">Skills</div>
@@ -267,14 +220,11 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Data rows */}
               {filteredRows.map((row) => (
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
                     {row.course}
                   </div>
-
-                  {/* Skills display: show descriptions, or a helpful empty state */}
                   <div className="admin-cell admin-cell-skills">
                     {row.skills.length > 0 ? (
                       <ul>
@@ -286,8 +236,6 @@ const AdminDashboard: React.FC = () => {
                       <span className="muted">No skills mapped yet</span>
                     )}
                   </div>
-
-                  {/* Competencies + edit button */}
                   <div className="admin-cell admin-cell-competencies">
                     <div className="competency-content">
                       {row.competencies.length > 0 ? (
@@ -301,8 +249,6 @@ const AdminDashboard: React.FC = () => {
                           No competencies mapped yet
                         </span>
                       )}
-
-                      {/* Opens a single shared modal with the selected course context */}
                       <button
                         type="button"
                         className="edit-icon-button"
@@ -318,18 +264,15 @@ const AdminDashboard: React.FC = () => {
                 </div>
               ))}
 
-              {/* One modal instance: controlled by editing state */}
               <EditCourseMappingModal
                 isOpen={editing !== null}
                 courseId={editing?.id ?? 0}
                 courseCode={editing?.code ?? ""}
                 onClose={() => setEditing(null)}
-                // Trigger a refetch after saving to keep the table accurate
                 onSaved={() => setRefreshKey((k) => k + 1)}
                 apiFetch={apiFetch}
               />
 
-              {/* Empty table message */}
               {filteredRows.length === 0 && (
                 <div className="admin-table-row admin-empty-row">
                   <div className="admin-cell" style={{ gridColumn: "1 / 4" }}>

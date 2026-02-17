@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { supabase } from "../supabaseClient";
 import { saveSession } from "./Session";
 
@@ -8,129 +9,135 @@ interface CreateAccountModalProps {
   onClose: () => void;
 }
 
+interface IFormInput {
+  userType: "Student" | "Faculty/Administrator";
+  firstName: string;
+  lastName: string;
+  email: string;
+  major?: string;
+  password: string;
+  confirmPassword: string;
+}
+
 const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   showModal,
   onClose,
 }) => {
   const navigate = useNavigate();
-  const [userType, setUserType] = useState<string>("Student");
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [confirmPassword, setConfirmPassword] = useState<string>("");
-  const [firstName, setFirstName] = useState<string>("");
-  const [lastName, setLastName] = useState<string>("");
-  const [major, setMajor] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const AUTOFACULTY = false;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  // Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<IFormInput>({
+    defaultValues: {
+      userType: "Student",
+      email: "",
+      firstName: "",
+      lastName: "",
+      major: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Watch userType to conditionally render/validate the Major field
+  const userType = watch("userType");
+  // Watch password to validate confirmPassword against it
+  const password = watch("password");
+
+  const onSubmit: SubmitHandler<IFormInput> = async (data) => {
+    setServerError("");
     setLoading(true);
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
-      return;
-    }
-
     try {
-      if (userType === "Student") {
+      if (data.userType === "Student") {
         const { data: existingUser } = await supabase
           .from("Student")
           .select("*")
-          .eq("Student_Qu_Email", email + "@quinnipiac.edu")
+          .eq("Student_Qu_Email", data.email + "@quinnipiac.edu")
           .single();
 
         if (existingUser) {
           throw new Error("An account with this email already exists");
         }
 
-        const { data, error } = await supabase
+        const { data: newData, error } = await supabase
           .from("Student")
           .insert({
-            Student_Qu_Email: email + "@quinnipiac.edu",
-            Password: password,
-            FirstName: firstName,
-            LastName: lastName,
-            Major: major,
+            Student_Qu_Email: data.email + "@quinnipiac.edu",
+            Password: data.password,
+            FirstName: data.firstName,
+            LastName: data.lastName,
+            Major: data.major,
           })
           .select()
           .single();
 
         if (error) throw error;
 
-        console.log("Student account created:", data);
-        // alert("Student account created successfully!");
+        console.log("Student account created:", newData);
 
         saveSession({
-          userId: data.Student_Id,
+          userId: newData.Student_Id,
           userType: "Student",
-          userEmail: data.Student_Qu_Email,
+          userEmail: newData.Student_Qu_Email,
         });
 
-        resetForm();
-        onClose();
+        handleClose();
         navigate("/studentdashboard");
       } else {
         const { data: existingUser } = await supabase
           .from("Faculty_Admin")
           .select("*")
-          .eq("Faculty_Qu_Email", email + "@quinnipiac.edu")
+          .eq("Faculty_Qu_Email", data.email + "@quinnipiac.edu")
           .single();
 
         if (existingUser) {
           throw new Error("An account with this email already exists");
         }
 
-        const { data, error } = await supabase
+        const { data: newData, error } = await supabase
           .from("Faculty_Admin")
           .insert({
             Type: AUTOFACULTY,
-            Faculty_Qu_Email: email + "@quinnipiac.edu",
-            Password: password,
-            FirstName: firstName,
-            LastName: lastName,
+            Faculty_Qu_Email: data.email + "@quinnipiac.edu",
+            Password: data.password,
+            FirstName: data.firstName,
+            LastName: data.lastName,
           })
           .select()
           .single();
 
         if (error) throw error;
 
-        console.log("Faculty/Admin account created:", data);
-        // alert("Faculty/Administrator account created successfully!");
+        console.log("Faculty/Admin account created:", newData);
 
         saveSession({
-          userId: data.Faculty_Id,
+          userId: newData.Faculty_Id,
           userType: "Faculty/Administrator",
-          userEmail: data.Faculty_Qu_Email,
+          userEmail: newData.Faculty_Qu_Email,
         });
 
-        resetForm();
-        onClose();
+        handleClose();
         navigate("/facultyAdmin");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to create account");
+      setServerError(err.message || "Failed to create account");
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setUserType("Student");
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
-    setFirstName("");
-    setLastName("");
-    setMajor("");
-    setError("");
-  };
-
   const handleClose = () => {
-    resetForm();
+    reset(); // Clear form errors and values
+    setServerError("");
     onClose();
   };
 
@@ -155,14 +162,9 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
             ></button>
           </div>
           <div className="modal-body">
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit(onSubmit)}>
               <div className="mb-3">
-                <select
-                  className="form-select"
-                  value={userType}
-                  onChange={(e) => setUserType(e.target.value)}
-                  required
-                >
+                <select className="form-select" {...register("userType")}>
                   <option value="Student">Student</option>
                   <option value="Faculty/Administrator">
                     Faculty/Administrator
@@ -173,79 +175,114 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
               <div className="mb-3">
                 <input
                   type="text"
-                  className="form-control"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
+                  className={`form-control ${errors.firstName ? "is-invalid" : ""}`}
                   placeholder="First Name..."
+                  {...register("firstName", {
+                    required: "First Name is required",
+                  })}
                 />
+                {errors.firstName && (
+                  <div className="invalid-feedback">
+                    {errors.firstName.message}
+                  </div>
+                )}
               </div>
 
               <div className="mb-3">
                 <input
                   type="text"
-                  className="form-control"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
+                  className={`form-control ${errors.lastName ? "is-invalid" : ""}`}
                   placeholder="Last Name..."
+                  {...register("lastName", {
+                    required: "Last Name is required",
+                  })}
                 />
+                {errors.lastName && (
+                  <div className="invalid-feedback">
+                    {errors.lastName.message}
+                  </div>
+                )}
               </div>
 
               {userType === "Student" && (
                 <div className="mb-3">
                   <input
                     type="text"
-                    className="form-control"
-                    value={major}
-                    onChange={(e) => setMajor(e.target.value)}
-                    required
+                    className={`form-control ${errors.major ? "is-invalid" : ""}`}
                     placeholder="Major"
+                    {...register("major", {
+                      required:
+                        userType === "Student" ? "Major is required" : false,
+                    })}
                   />
+                  {errors.major && (
+                    <div className="invalid-feedback">
+                      {errors.major.message}
+                    </div>
+                  )}
                 </div>
               )}
 
               <div className="mb-3">
                 <div className="input-group">
                   <input
-                    type="email"
-                    className="form-control"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    type="text"
+                    className={`form-control ${errors.email ? "is-invalid" : ""}`}
                     placeholder="Quinnipiac E-Mail"
+                    {...register("email", { required: "Email is required" })}
                   />
                   <span className="input-group-text" id="basic-addon2">
                     @quinnipiac.edu
                   </span>
+                  {errors.email && (
+                    <div className="invalid-feedback">
+                      {errors.email.message}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="mb-3">
                 <input
                   type="password"
-                  className="form-control"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  className={`form-control ${errors.password ? "is-invalid" : ""}`}
                   placeholder="Password"
+                  {...register("password", {
+                    required: "Password is required",
+                    minLength: {
+                      value: 6,
+                      message: "Password must be at least 6 characters",
+                    },
+                  })}
                 />
+                {errors.password && (
+                  <div className="invalid-feedback">
+                    {errors.password.message}
+                  </div>
+                )}
               </div>
 
               <div className="mb-3">
                 <input
                   type="password"
-                  className="form-control"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
+                  className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
                   placeholder="Confirm Password"
+                  {...register("confirmPassword", {
+                    required: "Please confirm your password",
+                    validate: (val) =>
+                      val === password || "Passwords do not match",
+                  })}
                 />
+                {errors.confirmPassword && (
+                  <div className="invalid-feedback">
+                    {errors.confirmPassword.message}
+                  </div>
+                )}
               </div>
 
-              {error && (
+              {serverError && (
                 <div className="alert alert-danger" role="alert">
-                  {error}
+                  {serverError}
                 </div>
               )}
 
