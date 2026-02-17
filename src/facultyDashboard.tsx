@@ -1,5 +1,10 @@
 // src/facultyDashboard.tsx
-import React, { useState, type ChangeEvent, type FormEvent } from "react";
+import React, {
+  useState,
+  useEffect,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import Footer from "./footer";
 import "./FacultyDashboard.css";
 import "./StudentDashboard.css";
@@ -7,11 +12,7 @@ import Navbar from "./Navbar";
 import CourseCard from "./components/CourseCard";
 
 /* ---------- Types & Data from Student Dashboard ------------------------- */
-type MajorOption =
-  | "Software Engineering"
-  | "Computer Science"
-  | "Mechanical Engineering"
-  | "Industrial Engineering";
+type MajorOption = string; // Relaxed type to allow dynamic DB values
 
 interface ClassOption {
   id: string;
@@ -38,9 +39,12 @@ const FacultyDashboard: React.FC = () => {
   const [courseCompetencies, setCourseCompetencies] = useState("");
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [majorClasses, setMajorClasses] = useState<Record<
+    string,
+    ClassOption[]
+  > | null>(null);
 
   /* ---------- Helpers ---------------------------------------------------*/
-  // simple incremental id generator – works fine for a demo
   let nextId = Math.max(...courses.map((c) => c.id), 0) + 1;
 
   const addCourse = (e: FormEvent) => {
@@ -66,16 +70,27 @@ const FacultyDashboard: React.FC = () => {
     setCourseName(""); // Reset course selection when major changes
   };
 
-  const [majorClasses, setMajorClasses] = useState<Record<MajorOption, ClassOption[]> | null>(null);
+  // FIX: Wrap fetch in useEffect to prevent infinite loops
+  useEffect(() => {
+    const fetchMajorClasses = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/courses");
+        const result = await response.json();
+        setMajorClasses(result);
 
-  // Define an async function
-  const fetchMajorClasses = async () => {
-    const response = await fetch('http://localhost:3001/courses');
-    const result = await response.json();
-    setMajorClasses(result);
-  };
+        // Optional: If the currently selected major isn't in the fetched list, select the first one
+        const keys = Object.keys(result);
+        if (keys.length > 0 && !keys.includes(selectedMajor)) {
+          setSelectedMajor(keys[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch majors:", err);
+      }
+    };
 
-  fetchMajorClasses()
+    fetchMajorClasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   /* ---------- Render ---------------------------------------------------- */
   return (
@@ -107,18 +122,22 @@ const FacultyDashboard: React.FC = () => {
                 >
                   Select Major:
                 </label>
-                {majorClasses ? (<select
-                  className="textbox"
-                  value={selectedMajor}
-                  onChange={handleMajorChange}
-                  style={styles.input}
-                >
-                  {Object.keys(majorClasses).map((major) => (
-                    <option key={major} value={major}>
-                      {major}
-                    </option>
-                  ))}
-                </select>) : (<p></p>)}
+                {majorClasses ? (
+                  <select
+                    className="textbox"
+                    value={selectedMajor}
+                    onChange={handleMajorChange}
+                    style={styles.input}
+                  >
+                    {Object.keys(majorClasses).map((major) => (
+                      <option key={major} value={major}>
+                        {major}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-muted">Loading majors...</p>
+                )}
               </div>
 
               {/* Course Selection (Radio Buttons) */}
@@ -132,7 +151,9 @@ const FacultyDashboard: React.FC = () => {
                 >
                   Select Course:
                 </label>
-                {majorClasses && majorClasses[selectedMajor].length > 0 ? (
+                {majorClasses &&
+                majorClasses[selectedMajor] &&
+                majorClasses[selectedMajor].length > 0 ? (
                   <div className="class-grid">
                     {majorClasses[selectedMajor].map((c) => (
                       <label key={c.id} className="class-option">
@@ -236,7 +257,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     alignItems: "center",
     gap: 10,
-    width: "100%", // Take full width of container
+    width: "100%",
   },
 
   input: {
@@ -255,28 +276,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     cursor: "pointer",
     marginTop: "10px",
-  },
-
-  list: { marginTop: 20, listStyle: "none", paddingLeft: 0 },
-  listItem: {
-    padding: "8px 12px",
-    marginBottom: 6,
-    background: "#fff",
-    borderRadius: 4,
-    border: "1px solid #ddd",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  deleteButton: {
-    padding: "2px 8px",
-    fontSize: 12,
-    background: "#dc3545",
-    color: "#fff",
-    border: "none",
-    borderRadius: 4,
-    cursor: "pointer",
   },
 };
 
