@@ -3,41 +3,28 @@ import { useNavigate } from "react-router-dom";
 import "./Navbar.css";
 import quLogo from "./assets/Qyellow_logo.png";
 import EditAccountModal from "./EditAccountModal";
-import { loadSession, clearSession, type UserType } from "./Session";
+import { loadSession, clearSession } from "./Session";
 
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [userId, setUserId] = useState<number | null>(null);
-  const [userType, setUserType] = useState<UserType | null>(null);
+  const [userType, setUserType] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Read user info from session once on mount
   useEffect(() => {
     const session = loadSession();
-    if (session) {
-      setUserId(session.userId);
-      setUserType(session.userType);
-    } else {
-      setUserId(null);
-      setUserType(null);
-    }
+    setUserType(session?.userType ?? null);
   }, []);
 
   const handleProfileClick = () => {
-    if (userId && userType) {
+    if (userType) {
       setShowEditModal(true);
     } else {
-      console.warn("No userId/userType found; cannot open EditAccountModal.");
+      console.warn("No session found; cannot open EditAccountModal.");
     }
-  };
-
-  const handleCloseModal = () => {
-    setShowEditModal(false);
   };
 
   const handleSignOut = () => {
     clearSession();
-    setUserId(null);
     setUserType(null);
     navigate("/");
   };
@@ -81,12 +68,11 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {showEditModal && userId !== null && userType && (
+      {showEditModal && userType && (
         <EditAccountModal
           showModal={showEditModal}
-          onClose={handleCloseModal}
-          userType={userType}
-          userId={userId}
+          onClose={() => setShowEditModal(false)}
+          userType={userType as "Student" | "Faculty/Administrator"}
         />
       )}
     </>

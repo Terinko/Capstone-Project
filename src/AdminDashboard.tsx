@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Footer from "./footer";
 import Navbar from "./Navbar";
 import "./AdminDashboard.css";
-import { loadSession } from "./Session";
 import EditCourseMappingModal from "./EditCourseMappingModal";
+import { loadSession, clearSession } from "./Session";
 
 type CompletionStatus = "Mapped" | "Unmapped";
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
@@ -25,22 +25,29 @@ if (!API_BASE) {
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = loadSession();
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(session && {
-        "x-user-id": String(session.userId),
-        "x-user-type": session.userType,
-      }),
+      // Send JWT instead of raw user-id/user-type headers
+      ...(session && { Authorization: `Bearer ${session.token}` }),
       ...(init?.headers ?? {}),
     },
   });
+
+  if (res.status === 401) {
+    // Token expired or invalid — force logout
+    clearSession();
+    window.location.href = "/";
+    throw new Error("Session expired, please log in again");
+  }
 
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `Request failed: ${res.status}`);
   }
+
   return (await res.json()) as T;
 }
 

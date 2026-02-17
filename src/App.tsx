@@ -1,16 +1,35 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CreateAccountModal from "./CreateAccountModal";
 import LoginModal from "./LoginModal";
+import { loadSession } from "./Session";
 import "./LandingPage.css";
 import nameLogo from "./assets/name_logo.png";
+
+function getDestination(userType: string): string {
+  if (userType === "Student") return "/studentdashboard";
+  if (userType === "Administrator") return "/adminDashboard";
+  return "/facultyAdmin";
+}
 
 const App: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLoginClick = () => {
+    // If a valid session token already exists, skip the modal and
+    // navigate directly to the appropriate dashboard
+    const session = loadSession();
+    if (session?.token) {
+      navigate(getDestination(session.userType), { replace: true });
+      return;
+    }
+    setShowLoginModal(true);
+  };
 
   return (
     <div className="landing-page bg-light min-vh-100 d-flex flex-column">
-      {/* hero: gradient background + logo */}
       <header className="hero-section d-flex align-items-center justify-content-center">
         <img
           src={nameLogo}
@@ -19,7 +38,6 @@ const App: React.FC = () => {
         />
       </header>
 
-      {/* main content */}
       <main className="flex-grow-1">
         <section className="container-fluid py-5 main-section-center">
           <div className="content-wrapper text-center">
@@ -44,7 +62,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 className="buttons me-3 px-4 py-2"
-                onClick={() => setShowLoginModal(true)}
+                onClick={handleLoginClick}
               >
                 Log In
               </button>

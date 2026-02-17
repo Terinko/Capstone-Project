@@ -80,7 +80,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       const session = await res.json();
 
       saveSession({
-        userId: session.userId,
+        token: session.token,
         userType: session.userType,
         userEmail: session.userEmail,
       });
