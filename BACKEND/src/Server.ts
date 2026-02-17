@@ -4,6 +4,8 @@ import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
 import { RequireAdmin } from "./Middleware/RequireAdmin.js";
 import { getAllCourses } from "./Models/CoursesModel.js";
+import { authRouter } from "./Routers/AuthRouter.js";
+import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -16,6 +18,8 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/auth", createAccountRouter);
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { supabase } from "../supabaseClient";
 import { saveSession } from "./Session";
 
 interface LoginModalProps {
@@ -30,64 +29,31 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
     setServerError("");
     setLoading(true);
 
-    const fullEmail = `${data.email}@quinnipiac.edu`;
-
     try {
-      // Check Student table
-      const { data: studentData } = await supabase
-        .from("Student")
-        .select("*")
-        .eq("Student_Qu_Email", fullEmail)
-        .eq("Password", data.password)
-        .single();
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+          }),
+        },
+      );
 
-      if (studentData) {
-        console.log("Student logged in:", studentData);
-
-        saveSession({
-          userId: studentData.Student_Id,
-          userType: "Student",
-          userEmail: studentData.Student_Qu_Email,
-        });
-
-        handleClose();
-        navigate("/studentdashboard");
-        return;
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Login failed");
       }
 
-      // Check Faculty/Admin table
-      const { data: facultyData } = await supabase
-        .from("Faculty_Admin")
-        .select("*")
-        .eq("Faculty_Qu_Email", fullEmail)
-        .eq("Password", data.password)
-        .single();
+      const session = await res.json();
+      saveSession(session);
+      handleClose();
 
-      if (facultyData) {
-        console.log("Faculty/Admin logged in:", facultyData);
-
-        saveSession({
-          userId: facultyData.Faculty_Id,
-          userType: "Faculty/Administrator",
-          userEmail: facultyData.Faculty_Qu_Email,
-        });
-
-        handleClose();
-
-        const isAdmin =
-          facultyData.Faculty_Qu_Email?.toLowerCase() ===
-          "sample.admin@quinnipiac.edu";
-
-        if (isAdmin) {
-          // Go to admin dashboard
-          navigate("/adminDashboard");
-        } else {
-          navigate("/facultyAdmin");
-        }
-        return;
-      }
-
-      throw new Error("Invalid email or password");
+      if (session.userType === "Administrator") navigate("/adminDashboard");
+      else if (session.userType === "Student") navigate("/studentdashboard");
+      else navigate("/facultyAdmin");
     } catch (err: any) {
       setServerError(err.message || "Invalid email or password");
     } finally {
