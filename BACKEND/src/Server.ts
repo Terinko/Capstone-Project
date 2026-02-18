@@ -2,9 +2,11 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
+import { RequireAdmin, RequireAuth } from "./Middleware/RequireAuth.js";
 import { getAllCourses } from "./Models/CoursesModel.js";
 import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
+import { authProfileRouter } from "./Routers/AuthProfileRouter.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -15,6 +17,8 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_API_KEY) {
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use("/api/auth", authRouter);
+app.use("/api/auth", RequireAuth, authProfileRouter);
 
 app.use("/api/admin", adminCoursesRouter);
 app.use("/api/auth", authRouter);

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
-// :contentReference[oaicite:0]{index=0}
+import { loadSession, clearSession } from "./Session";
 
 type UserType = "Student" | "Faculty/Administrator";
 
@@ -8,14 +7,45 @@ interface EditAccountModalProps {
   showModal: boolean;
   onClose: () => void;
   userType: UserType;
-  userId: number; // Student_Id or Faculty_Id
+}
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE) {
+  throw new Error("VITE_API_BASE_URL is not defined");
+}
+
+// Centralized fetch helper — sends JWT, handles expiry
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = loadSession();
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(session && { Authorization: `Bearer ${session.token}` }),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (res.status === 401) {
+    clearSession();
+    window.location.href = "/";
+    throw new Error("Session expired, please log in again");
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Request failed: ${res.status}`);
+  }
+
+  return (await res.json()) as T;
 }
 
 const EditAccountModal: React.FC<EditAccountModalProps> = ({
   showModal,
   onClose,
   userType,
-  userId,
 }) => {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -30,8 +60,10 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Fetch current account info from the backend using the JWT —
+  // the server resolves who the user is from the token, not from a passed-in userId
   useEffect(() => {
-    if (!showModal || !userId) return;
+    if (!showModal) return;
 
     const fetchUser = async () => {
       setInitialLoading(true);
@@ -39,26 +71,17 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
       setSuccess("");
 
       try {
-        const table = userType === "Student" ? "Student" : "Faculty_Admin";
-        const idColumn = userType === "Student" ? "Student_Id" : "Faculty_Id";
+        const data = await apiFetch<{
+          firstName: string;
+          lastName: string;
+          email: string;
+          major?: string;
+        }>("/api/auth/me");
 
-        const { data, error } = await supabase
-          .from(table)
-          .select("*")
-          .eq(idColumn, userId)
-          .single();
-
-        if (error) throw error;
-        if (!data) throw new Error("Account not found");
-
-        setFirstName(data.FirstName || "");
-        setLastName(data.LastName || "");
-        if (userType === "Student") {
-          setMajor(data.Major || "");
-          setEmail(data.Student_Qu_Email || "");
-        } else {
-          setEmail(data.Faculty_Qu_Email || "");
-        }
+        setFirstName(data.firstName);
+        setLastName(data.lastName);
+        setEmail(data.email);
+        if (userType === "Student") setMajor(data.major ?? "");
       } catch (err: any) {
         setError(err.message || "Failed to load account");
       } finally {
@@ -67,7 +90,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     };
 
     fetchUser();
-  }, [showModal, userId, userType]);
+  }, [showModal, userType]);
 
   const handleClose = () => {
     setPassword("");
@@ -84,34 +107,19 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     setSaving(true);
 
     try {
-      if (password || confirmPassword) {
-        if (password !== confirmPassword) {
-          throw new Error("Passwords do not match");
-        }
+      if (password && password !== confirmPassword) {
+        throw new Error("Passwords do not match");
       }
 
-      const table = userType === "Student" ? "Student" : "Faculty_Admin";
-      const idColumn = userType === "Student" ? "Student_Id" : "Faculty_Id";
+      const body: Record<string, any> = { firstName, lastName };
+      if (userType === "Student") body.major = major;
+      // Only include password in payload if the user actually typed one
+      if (password) body.password = password;
 
-      const updatePayload: Record<string, any> = {
-        FirstName: firstName,
-        LastName: lastName,
-      };
-
-      if (userType === "Student") {
-        updatePayload.Major = major;
-      }
-
-      if (password) {
-        updatePayload.Password = password;
-      }
-
-      const { error } = await supabase
-        .from(table)
-        .update(updatePayload)
-        .eq(idColumn, userId);
-
-      if (error) throw error;
+      await apiFetch("/api/auth/me", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
 
       setSuccess("Account updated successfully.");
       setPassword("");

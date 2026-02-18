@@ -1,37 +1,29 @@
-export type UserType = "Student" | "Faculty/Administrator";
+const SESSION_KEY = "qu_session";
 
-export interface UserSession {
-  userId: number;
-  userType: UserType;
+export interface Session {
+  token: string;
+  userType: string;
   userEmail: string;
 }
 
-const STORAGE_KEY = "quResumeSession";
-
-export function saveSession(session: UserSession) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+export function saveSession(session: Session): void {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-export function loadSession(): UserSession | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
+export function loadSession(): Session | null {
+  const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return null;
-
   try {
-    const parsed = JSON.parse(raw) as UserSession;
-    if (
-      typeof parsed.userId === "number" &&
-      (parsed.userType === "Student" ||
-        parsed.userType === "Faculty/Administrator") &&
-      typeof parsed.userEmail === "string"
-    ) {
-      return parsed;
-    }
-    return null;
+    return JSON.parse(raw) as Session;
   } catch {
     return null;
   }
 }
 
-export function clearSession() {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+export function isLoggedIn(): boolean {
+  return loadSession() !== null;
 }
