@@ -17,9 +17,12 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_API_KEY) {
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+// Public routes that don't require authentication
 app.use("/api/auth", authRouter);
-app.use("/api/auth", RequireAuth, authProfileRouter);
+app.use("/api/auth", createAccountRouter);
 
+// Protected routes that require any authenticated user (student, faculty, or admin)
+app.use("/api/auth", RequireAuth, authProfileRouter);
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/auth", createAccountRouter);

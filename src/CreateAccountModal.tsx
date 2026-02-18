@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { saveSession } from "./Session";
@@ -31,6 +31,7 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [majorsList, setMajorsList] = useState<string[]>([]); // State for the dropdown options
 
   const {
     register,
@@ -52,6 +53,19 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
 
   const userType = watch("userType");
   const password = watch("password");
+
+  // Fetch the list of majors when the modal opens
+  useEffect(() => {
+    if (showModal) {
+      fetch(`${API_BASE}/api/auth/majors`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to load majors");
+          return res.json();
+        })
+        .then((data) => setMajorsList(data))
+        .catch((err) => console.error("Error loading majors:", err));
+    }
+  }, [showModal]);
 
   const onSubmit: SubmitHandler<IFormInput> = async (data) => {
     setServerError("");
@@ -168,17 +182,23 @@ const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
                 )}
               </div>
 
+              {/* Dynamic Major Dropdown */}
               {userType === "Student" && (
                 <div className="mb-3">
-                  <input
-                    type="text"
-                    className={`form-control ${errors.major ? "is-invalid" : ""}`}
-                    placeholder="Major"
+                  <select
+                    className={`form-select ${errors.major ? "is-invalid" : ""}`}
                     {...register("major", {
                       required:
                         userType === "Student" ? "Major is required" : false,
                     })}
-                  />
+                  >
+                    <option value="">Select Major...</option>
+                    {majorsList.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
                   {errors.major && (
                     <div className="invalid-feedback">
                       {errors.major.message}
