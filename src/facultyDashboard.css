@@ -1,9 +1,0 @@
-.facultyForm {
-    display: "flex";
-    flex-direction: "row";
-    gap: 10;
-}
-
-.textbox {
-    background-color: white;
-}
