@@ -67,6 +67,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
     onClose();
   };
 
+  const handleForgotPassword = () => {
+    reset();
+    setServerError("");
+    // TODO - ADD FORGOT PASSWORD FUNCTIONALITY
+    onClose();
+  };
+
   if (!showModal) return null;
 
   return (
@@ -129,6 +136,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
                   {serverError}
                 </div>
               )}
+              <a href="#" onClick={handleForgotPassword}>Forgot Password</a>
+              <br/>
 
               <div className="d-flex gap-2">
                 <button
