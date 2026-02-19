@@ -5,6 +5,7 @@ import LoginModal from "./LoginModal";
 import { loadSession } from "./Session";
 import "./LandingPage.css";
 import nameLogo from "./assets/name_logo.png";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 
 function getDestination(userType: string): string {
   if (userType === "Student") return "/studentdashboard";
@@ -14,6 +15,7 @@ function getDestination(userType: string): string {
 
 const App: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const navigate = useNavigate();
 
@@ -82,12 +84,19 @@ const App: React.FC = () => {
       <LoginModal
         showModal={showLoginModal}
         onClose={() => setShowLoginModal(false)}
+        onForgotPassword={() => setShowForgotPasswordModal(true)}
       />
 
       <CreateAccountModal
         showModal={showCreateModal}
         onClose={() => setShowCreateModal(false)}
       />
+
+      <ForgotPasswordModal
+        showModal={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
+      
     </div>
   );
 };

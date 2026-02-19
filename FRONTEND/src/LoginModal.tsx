@@ -6,6 +6,7 @@ import { saveSession } from "./Session";
 interface LoginModalProps {
   showModal: boolean;
   onClose: () => void;
+  onForgotPassword: () => void;
 }
 
 interface ILoginInput {
@@ -13,7 +14,11 @@ interface ILoginInput {
   password: string;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
+const LoginModal: React.FC<LoginModalProps> = ({
+  showModal,
+  onClose,
+  onForgotPassword,
+}) => {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -70,8 +75,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
   const handleForgotPassword = () => {
     reset();
     setServerError("");
-    // TODO - ADD FORGOT PASSWORD FUNCTIONALITY
     onClose();
+    onForgotPassword();
   };
 
   if (!showModal) return null;
@@ -136,8 +141,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
                   {serverError}
                 </div>
               )}
-              <a href="#" onClick={handleForgotPassword}>Forgot Password</a>
-              <br/>
+              <a href="#" onClick={handleForgotPassword}>
+                Forgot Password
+              </a>
+              <br />
 
               <div className="d-flex gap-2">
                 <button
