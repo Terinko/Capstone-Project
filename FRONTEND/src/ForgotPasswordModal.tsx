@@ -20,7 +20,9 @@ const ForgotPasswordModal: React.FC<ForgotPasswordProps> = ({
   } = useForm<IForgotPasswordInput>();
 
   const onSubmit: SubmitHandler<IForgotPasswordInput> = async (data) => {
+    // TODO: send code to email.
     console.log(data);
+    onClose();
   }
 
   const handleClose = () => {
