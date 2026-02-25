@@ -7,11 +7,11 @@ export interface Session {
 }
 
 export function saveSession(session: Session): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export function loadSession(): Session | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const raw = sessionStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as Session;
@@ -21,7 +21,7 @@ export function loadSession(): Session | null {
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function isLoggedIn(): boolean {

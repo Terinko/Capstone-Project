@@ -7,6 +7,7 @@ import { getAllCourses } from "./Models/CoursesModel.js";
 import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
 import { authProfileRouter } from "./Routers/AuthProfileRouter.js";
+import { forgotPasswordRouter } from "./Routers/ForgotPasswordRouter.js"; // ← NEW
 
 const app = express();
 app.disable("x-powered-by");
@@ -17,15 +18,15 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_API_KEY) {
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
-// Public routes that don't require authentication
+
+// Public routes (no auth required)
 app.use("/api/auth", authRouter);
 app.use("/api/auth", createAccountRouter);
+app.use("/api/auth", forgotPasswordRouter); // ← NEW: forgot-password, verify-code, reset-password
 
-// Protected routes that require any authenticated user (student, faculty, or admin)
+// Protected routes
 app.use("/api/auth", RequireAuth, authProfileRouter);
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
-app.use("/api/auth", authRouter);
-app.use("/api/auth", createAccountRouter);
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
@@ -33,7 +34,6 @@ app.get("/courses", async (req: Request, res: Response) => {
   try {
     const courses = await getAllCourses();
 
-    // 1. Initialize the Standard Majors (so they always show up, even if empty)
     const grouped: Record<string, any[]> = {
       "Software Engineering": [],
       "Computer Science": [],
@@ -41,13 +41,8 @@ app.get("/courses", async (req: Request, res: Response) => {
       "Industrial Engineering": [],
     };
 
-    // 2. Populate from Database
     courses.forEach((c) => {
-      // If the DB has "Civil Engineering", this will create that key automatically.
-      if (!grouped[c.Major]) {
-        grouped[c.Major] = [];
-      }
-
+      if (!grouped[c.Major]) grouped[c.Major] = [];
       (grouped as any)[c.Major].push({
         id: String(c.Course_Id),
         label: c.Course_Code,

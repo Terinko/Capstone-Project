@@ -55,7 +55,6 @@ const StudentDashboard: React.FC = () => {
   > | null>(null);
 
   // 1. FETCH CLASSES ON MOUNT
-  // This replaces the direct function call that caused loops
   useEffect(() => {
     const fetchMajorClasses = async () => {
       try {
@@ -71,7 +70,7 @@ const StudentDashboard: React.FC = () => {
     };
 
     fetchMajorClasses();
-  }, []); // Run once on mount
+  }, []);
 
   const availableClasses =
     majorClasses && majorClasses[major] ? majorClasses[major] : [];
@@ -79,7 +78,6 @@ const StudentDashboard: React.FC = () => {
   // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
   useEffect(() => {
     const loadSkillsForClasses = async () => {
-      // If no classes available yet, clear skills and wait
       if (!availableClasses || availableClasses.length === 0) {
         setCourseSkills({});
         return;
@@ -88,8 +86,6 @@ const StudentDashboard: React.FC = () => {
       setIsLoadingSkills(true);
 
       try {
-        // OPTIMIZATION: Use the numeric IDs provided by the backend directly.
-        // The backend sends { id: "15", ... } where "15" is the Course_Id.
         const validNumericIds = availableClasses
           .map((c) => Number(c.id))
           .filter((n) => !isNaN(n) && n > 0);
@@ -100,7 +96,6 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        // Fetch Mappings directly using IDs (Skip the extra "Courses" table lookup)
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
@@ -113,7 +108,6 @@ const StudentDashboard: React.FC = () => {
           return;
         }
 
-        // Fetch Skills Details
         const skillIds = [
           ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
         ];
@@ -125,11 +119,9 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
-        // Create a lookup for mapping back to the "Code" (e.g., SER-491)
-        // The dashboard uses the Code string as the key in courseSkills
         const idToCodeMap: Record<number, string> = {};
         availableClasses.forEach((c) => {
-          idToCodeMap[Number(c.id)] = c.courseId!; // c.courseId is "SER-491"
+          idToCodeMap[Number(c.id)] = c.courseId!;
         });
 
         const allSkills = (skillsData || []).map((s) => ({
@@ -139,7 +131,6 @@ const StudentDashboard: React.FC = () => {
           Description: getVal(s, "Description"),
         }));
 
-        // Build the final map keyed by Course Code
         const skillsLookup: Record<string, Skill[]> = {};
 
         mappingsData.forEach((mapping) => {
@@ -179,7 +170,7 @@ const StudentDashboard: React.FC = () => {
     };
 
     loadSkillsForClasses();
-  }, [major, majorClasses]); // Re-run if major changes or if class list loads
+  }, [major, majorClasses]);
 
   const handleClassToggle = (id: string) => {
     setSelectedClasses((prev) =>
@@ -187,24 +178,31 @@ const StudentDashboard: React.FC = () => {
     );
   };
 
-  const generateWithGemma = async (skillDescriptions: string[]) => {
+  const generateWithGemma = async (skillsByClass: Record<string, string[]>) => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const prompt = `Act as a professional resume writer.
-        I will provide a list of raw skills and tasks learned in university courses.
-        Please transform these into a list of strong, action-oriented resume bullet points.
-        
-        Raw Skills:
-        ${skillDescriptions.join("\n")}
+      const classBlocks = Object.entries(skillsByClass)
+        .map(
+          ([courseCode, skills]) =>
+            `Course: ${courseCode}\n${skills.map((s) => `- ${s}`).join("\n")}`,
+        )
+        .join("\n\n");
 
-        Requirements:
-        1. Use strong action verbs (e.g., Engineered, Orchestrated, Developed).
-        2. Consolidate related skills into single, impactful points where appropriate.
-        3. Do not include any introductory text or markdown formatting (like **bold**).
-        4. Return the output as a simple list separated by newlines.
-      `;
+      const prompt = `Act as a professional resume writer.
+I will provide skills and tasks learned, grouped by university course.
+Transform these into strong, action-oriented resume bullet points, grouped by course.
+
+${classBlocks}
+
+Requirements:
+1. Output each course as a labeled section header using only alphabetical and numeric characters and a semicolon (e.g., "SER-491:").
+2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
+3. Consolidate related skills within the same course where appropriate.
+4. Do not include any markdown formatting (like **bold**).
+5. Return plain text only, with course headers followed by bullet points on new lines.
+`;
 
       const payload = {
         model: MODEL_ID,
@@ -259,7 +257,8 @@ const StudentDashboard: React.FC = () => {
       selectedClasses.includes(c.id),
     );
 
-    const skillDescriptions: string[] = [];
+    // Build a map of { courseLabel -> skill descriptions[] } to preserve class context
+    const skillsByClass: Record<string, string[]> = {};
 
     selectedClassObjects.forEach((classObj) => {
       const lookupId = classObj.courseId;
@@ -268,19 +267,26 @@ const StudentDashboard: React.FC = () => {
         const descriptions = courseSkills[lookupId]
           .map((skill) => skill.Description)
           .filter(Boolean);
-        skillDescriptions.push(...descriptions);
+        if (descriptions.length > 0) {
+          skillsByClass[classObj.label] = descriptions;
+        }
       }
     });
 
-    if (skillDescriptions.length === 0) {
+    if (Object.keys(skillsByClass).length === 0) {
       setBullets(["No skills found in the database for the selected classes."]);
       return;
     }
 
     if (showRawSkills) {
-      setBullets(skillDescriptions);
+      // Show raw skills grouped by course for the tech demo
+      const flat = Object.entries(skillsByClass).flatMap(([course, skills]) => [
+        `--- ${course} ---`,
+        ...skills,
+      ]);
+      setBullets(flat);
     } else {
-      generateWithGemma(skillDescriptions);
+      generateWithGemma(skillsByClass);
     }
   };
 
@@ -464,9 +470,22 @@ const StudentDashboard: React.FC = () => {
                 </p>
               ) : (
                 <ul>
-                  {bullets.map((b, idx) => (
-                    <li key={idx}>{b}</li>
-                  ))}
+                  {bullets.map((b, idx) =>
+                    b.endsWith(":") || b.startsWith("---") ? (
+                      <p
+                        key={idx}
+                        style={{
+                          fontWeight: "bold",
+                          marginTop: "0.75rem",
+                          listStyle: "none",
+                        }}
+                      >
+                        {b}
+                      </p>
+                    ) : (
+                      <li key={idx}>{b}</li>
+                    ),
+                  )}
                 </ul>
               )}
             </div>
