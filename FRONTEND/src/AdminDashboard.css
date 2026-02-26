@@ -105,7 +105,7 @@
 /* Base row */
 .admin-table-row {
   display: grid;
-  grid-template-columns: 1.1fr 1.4fr 1.6fr;
+  grid-template-columns: 0.9fr 1.2fr 1.4fr 1.6fr;
   border-bottom: 1px solid #d1d5db;
 }
 

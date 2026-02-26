@@ -12,6 +12,7 @@ interface AdminCourseRow {
   id: number;
   course: string;
   major: string;
+  professor: string;
   completion: CompletionStatus;
   skills: string[];
   competencies: string[];
@@ -221,6 +222,7 @@ const AdminDashboard: React.FC = () => {
             <div className="admin-table">
               <div className="admin-table-row admin-table-header">
                 <div className="admin-cell admin-cell-course">Course</div>
+                <div className="admin-cell admin-cell-professor">Professor</div>
                 <div className="admin-cell admin-cell-skills">Skills</div>
                 <div className="admin-cell admin-cell-competencies">
                   Competencies
@@ -231,6 +233,13 @@ const AdminDashboard: React.FC = () => {
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
                     {row.course}
+                  </div>
+                  <div className="admin-cell admin-cell-professor">
+                    {row.professor ? (
+                      row.professor
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
                   </div>
                   <div className="admin-cell admin-cell-skills">
                     {row.skills.length > 0 ? (
@@ -275,6 +284,16 @@ const AdminDashboard: React.FC = () => {
                 isOpen={editing !== null}
                 courseId={editing?.id ?? 0}
                 courseCode={editing?.code ?? ""}
+                professor={
+                  editing
+                    ? (rows.find((r) => r.id === editing.id)?.professor ?? "")
+                    : ""
+                }
+                major={
+                  editing
+                    ? (rows.find((r) => r.id === editing.id)?.major ?? "")
+                    : ""
+                }
                 onClose={() => setEditing(null)}
                 onSaved={() => setRefreshKey((k) => k + 1)}
                 apiFetch={apiFetch}
@@ -282,7 +301,7 @@ const AdminDashboard: React.FC = () => {
 
               {filteredRows.length === 0 && (
                 <div className="admin-table-row admin-empty-row">
-                  <div className="admin-cell" style={{ gridColumn: "1 / 4" }}>
+                  <div className="admin-cell" style={{ gridColumn: "1 / 5" }}>
                     <span className="muted">
                       No courses match the selected filters.
                     </span>

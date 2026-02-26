@@ -4,14 +4,13 @@ import "./EditCourseMappingModal.css";
 
 /**
  * Represents a Skill or Competency option returned from the backend.
- * - Skills use Description for display
- * - Competencies use Skill_name
+ * - Skills and Competencies both use Skill_name
  */
 type Option = {
   Skill_Id: number;
   Skill_name: string;
   Type: boolean;
-  Description?: string | null;
+  majorMatch?: boolean;
 };
 
 /**
@@ -24,7 +23,7 @@ type SkillsOptionsResponse = {
 
 /**
  * Existing mappings for a course.
- * Skills are returned as descriptions, competencies as names.
+ * Skills and competencies are returned as names.
  */
 type CourseMappingResponse = {
   skills: string[];
@@ -39,6 +38,8 @@ type Props = {
   isOpen: boolean;
   courseId: number;
   courseCode: string;
+  professor: string;
+  major: string;
   onClose: () => void;
   onSaved: () => void;
   apiFetch: <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -48,6 +49,8 @@ export default function EditCourseMappingModal({
   isOpen,
   courseId,
   courseCode,
+  professor,
+  major,
   onClose,
   onSaved,
   apiFetch,
@@ -66,8 +69,10 @@ export default function EditCourseMappingModal({
   );
 
   /* -------------------- Form state -------------------- */
-  const [newDescription, setNewDescription] = useState("");
+  const [professorDraft, setProfessorDraft] = useState("");
+  const [newSkillName, setNewSkillName] = useState("");
   const [competencySearch, setCompetencySearch] = useState("");
+  const [pendingSkillNames, setPendingSkillNames] = useState<string[]>([]);
 
   /**
    * Load available skills/competencies and current course mappings
@@ -75,6 +80,9 @@ export default function EditCourseMappingModal({
    */
   useEffect(() => {
     if (!isOpen) return;
+
+    setProfessorDraft(professor ?? "");
+    setPendingSkillNames([]);
 
     let cancelled = false;
 
@@ -85,7 +93,9 @@ export default function EditCourseMappingModal({
 
         // Fetch options + existing mapping in parallel
         const [opts, mapping] = await Promise.all([
-          apiFetch<SkillsOptionsResponse>("/api/admin/skills-options"),
+          apiFetch<SkillsOptionsResponse>(
+            `/api/autofill/skills-dataset?scope=all&major=${encodeURIComponent(major)}`,
+          ),
           apiFetch<CourseMappingResponse>(
             `/api/admin/courses/${courseId}/mapping`,
           ),
@@ -95,11 +105,10 @@ export default function EditCourseMappingModal({
 
         setOptions(opts);
 
-        // Convert returned descriptions/names into IDs for checkbox state
+        // Convert returned names into IDs for checkbox state
         const skillIds = mapping.skills
           .map(
-            (desc) =>
-              opts.skills.find((s) => (s.Description ?? "") === desc)?.Skill_Id,
+            (name) => opts.skills.find((s) => s.Skill_name === name)?.Skill_Id,
           )
           .filter((id): id is number => !!id);
 
@@ -122,7 +131,7 @@ export default function EditCourseMappingModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, courseId, apiFetch]);
+  }, [isOpen, courseId, major, apiFetch]);
 
   /**
    * Resolve selected skill IDs into displayable text.
@@ -136,19 +145,42 @@ export default function EditCourseMappingModal({
     return selectedSkillIds
       .map((id) => {
         const skill = skillMap.get(id);
-        return skill
-          ? { id, description: skill.Description ?? skill.Skill_name }
-          : null;
+        return skill ? { id, name: skill.Skill_name } : null;
       })
-      .filter(Boolean) as { id: number; description: string }[];
+      .filter(Boolean) as { id: number; name: string }[];
   }, [options, selectedSkillIds]);
+
+  const skillSuggestions = useMemo(() => {
+    if (!options) return [];
+
+    const q = newSkillName.trim().toLowerCase();
+    if (!q) return [];
+
+    const selected = new Set(selectedSkillIds);
+    const pending = new Set(
+      pendingSkillNames.map((n) => n.trim().toLowerCase()),
+    );
+
+    return options.skills
+      .filter((s) => {
+        // limit suggestions to major skills only
+        if (!s.majorMatch) return false;
+
+        const name = s.Skill_name.trim().toLowerCase();
+        if (selected.has(s.Skill_Id)) return false;
+        if (pending.has(name)) return false;
+
+        return name.includes(q);
+      })
+      .slice(0, 10);
+  }, [options, newSkillName, selectedSkillIds, pendingSkillNames]);
 
   /**
    * Refresh skills/competencies after creating or deleting a skill.
    */
   async function refreshOptions() {
     const opts = await apiFetch<SkillsOptionsResponse>(
-      "/api/admin/skills-options",
+      `/api/autofill/skills-dataset?scope=all&major=${encodeURIComponent(major)}`,
     );
     setOptions(opts);
     return opts;
@@ -158,42 +190,43 @@ export default function EditCourseMappingModal({
    * Create a new Skill using the provided description.
    * If the backend reports it already exists, reuse it.
    */
-  async function handleCreateSkill() {
-    if (!newDescription.trim()) return;
+  function normalizeName(s: string) {
+    return s.trim().toLowerCase();
+  }
 
-    try {
-      setCreating(true);
-      setError(null);
+  /**
+   * "Create Skill" now stages locally.
+   * - If it already exists in options, we just select its ID
+   * - Otherwise we add its NAME to pendingSkillNames (not in DB yet)
+   */
+  function handleCreateSkill() {
+    const raw = newSkillName;
+    const name = raw.trim();
+    if (!name) return;
 
-      const created = await apiFetch<Option>("/api/admin/skills", {
-        method: "POST",
-        body: JSON.stringify({ description: newDescription.trim() }),
-      });
+    setError(null);
 
-      // Auto-select the newly created skill
-      setSelectedSkillIds((prev) => [...new Set([...prev, created.Skill_Id])]);
+    const norm = normalizeName(name);
 
-      await refreshOptions();
-      setNewDescription("");
-    } catch (e: any) {
-      try {
-        const parsed = JSON.parse(e.message);
-        if (parsed?.existing?.Skill_Id) {
-          // Backend tells us this skill already exists — reuse it
-          setSelectedSkillIds((prev) => [
-            ...new Set([...prev, parsed.existing.Skill_Id]),
-          ]);
-          setError("That skill already exists — using the existing one.");
-          await refreshOptions();
-          return;
-        }
-        setError(parsed?.error ?? "Failed to create skill");
-      } catch {
-        setError(e?.message ?? "Failed to create skill");
-      }
-    } finally {
-      setCreating(false);
+    // If it already exists in the Skills options list, select it
+    const existing = options?.skills.find(
+      (s) => normalizeName(s.Skill_name) === norm,
+    );
+
+    if (existing) {
+      setSelectedSkillIds((prev) => [...new Set([...prev, existing.Skill_Id])]);
+      setNewSkillName("");
+      return;
     }
+
+    // Otherwise, stage it locally (avoid duplicates)
+    setPendingSkillNames((prev) => {
+      const prevNorms = new Set(prev.map(normalizeName));
+      if (prevNorms.has(norm)) return prev;
+      return [...prev, name];
+    });
+
+    setNewSkillName("");
   }
 
   /**
@@ -201,11 +234,9 @@ export default function EditCourseMappingModal({
    * Confirmation is required because this affects all courses.
    */
   async function handleDeleteSkill(skillId: number) {
-    //if (!confirm("Delete this skill everywhere?")) return;
-
-    await apiFetch(`/api/admin/skills/${skillId}`, { method: "DELETE" });
+    // Remove the skill from THIS course mapping only.
+    // The Skills table should never be deleted from.
     setSelectedSkillIds((prev) => prev.filter((id) => id !== skillId));
-    await refreshOptions();
   }
 
   /**
@@ -216,14 +247,73 @@ export default function EditCourseMappingModal({
       setSaving(true);
       setError(null);
 
-      await apiFetch(`/api/admin/courses/${courseId}/mapping`, {
-        method: "PUT",
-        body: JSON.stringify({
-          skillIds: selectedSkillIds,
-          competencyIds: selectedCompetencyIds,
-        }),
-      });
+      // Save professor changes (if any) BEFORE saving the mapping
+      if ((professorDraft ?? "") !== (professor ?? "")) {
+        await apiFetch(`/api/admin/courses/${courseId}`, {
+          method: "PUT",
+          body: JSON.stringify({ professor: professorDraft }),
+        });
+      }
 
+      // 1) Create any pending skills in the DB *now* (on Save)
+      let newSkillIds: number[] = [];
+
+      if (pendingSkillNames.length > 0) {
+        setCreating(true);
+
+        for (const name of pendingSkillNames) {
+          const norm = name.trim().toLowerCase();
+
+          // If options now contains it (edge case), reuse
+          const existing = options?.skills.find(
+            (s) => s.Skill_name.trim().toLowerCase() === norm,
+          );
+          if (existing) {
+            newSkillIds.push(existing.Skill_Id);
+            continue;
+          }
+
+          try {
+            const created = await apiFetch<Option>("/api/admin/skills", {
+              method: "POST",
+              body: JSON.stringify({ name }),
+            });
+            newSkillIds.push(created.Skill_Id);
+          } catch (e: any) {
+            // If backend returns "already exists", reuse that Skill_Id
+            try {
+              const parsed = JSON.parse(e.message);
+              if (parsed?.existing?.Skill_Id) {
+                newSkillIds.push(parsed.existing.Skill_Id);
+                continue;
+              }
+              throw e;
+            } catch {
+              throw e;
+            }
+          }
+        }
+
+        setCreating(false);
+      }
+
+      const mergedSkillIds = Array.from(
+        new Set([...selectedSkillIds, ...newSkillIds]),
+      );
+
+      body: (JSON.stringify({
+        skillIds: mergedSkillIds,
+        competencyIds: selectedCompetencyIds,
+      }),
+        await apiFetch(`/api/admin/courses/${courseId}/mapping`, {
+          method: "PUT",
+          body: JSON.stringify({
+            skillIds: mergedSkillIds,
+            competencyIds: selectedCompetencyIds,
+          }),
+        }));
+
+      setPendingSkillNames([]);
       onSaved();
       onClose();
     } catch (e: any) {
@@ -266,27 +356,45 @@ export default function EditCourseMappingModal({
             <div className="edit-modal-loading">Loading…</div>
           ) : (
             <>
-              {/* Create Skill */}
-              <div className="edit-modal-create-center">
+              {/* Top row: Create Skill (left) + Professor (right) */}
+              <div className="edit-modal-top-row">
                 <div className="edit-modal-card create-skill-card">
                   <div className="edit-modal-card-title">Create Skill</div>
 
-                  <textarea
-                    className="edit-modal-textarea"
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder="Describe the skill students gain from this course"
+                  <input
+                    className="edit-modal-input"
+                    value={newSkillName}
+                    onChange={(e) => setNewSkillName(e.target.value)}
+                    placeholder="Skill name"
+                    list="skill-suggestions"
                   />
+
+                  <datalist id="skill-suggestions">
+                    {skillSuggestions.map((s) => (
+                      <option key={s.Skill_Id} value={s.Skill_name} />
+                    ))}
+                  </datalist>
 
                   <div className="edit-modal-card-actions">
                     <button
                       className="btn-primary"
                       onClick={handleCreateSkill}
-                      disabled={creating || !newDescription.trim()}
+                      disabled={creating || !newSkillName.trim()}
                     >
                       {creating ? "Creating…" : "Add Skill"}
                     </button>
                   </div>
+                </div>
+
+                <div className="edit-modal-card professor-card">
+                  <div className="edit-modal-card-title">Professor</div>
+
+                  <input
+                    className="edit-modal-input"
+                    value={professorDraft}
+                    onChange={(e) => setProfessorDraft(e.target.value)}
+                    placeholder="Professor name"
+                  />
                 </div>
               </div>
 
@@ -296,19 +404,41 @@ export default function EditCourseMappingModal({
                 <div className="edit-modal-column">
                   <h3>Assigned Skills</h3>
                   <div className="edit-modal-list">
-                    {assignedSkills.length === 0 && (
-                      <div className="edit-modal-empty">
-                        No skills assigned yet.
-                      </div>
-                    )}
+                    {assignedSkills.length === 0 &&
+                      pendingSkillNames.length === 0 && (
+                        <div className="edit-modal-empty">
+                          No skills assigned yet.
+                        </div>
+                      )}
 
                     {assignedSkills.map((s) => (
                       <div key={s.id} className="edit-modal-bank-row">
-                        <span>{s.description}</span>
+                        <span>{s.name}</span>
                         <button
                           className="icon-btn danger"
                           onClick={() => handleDeleteSkill(s.id)}
-                          aria-label="Delete"
+                          aria-label="Remove"
+                        >
+                          <FiTrash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {pendingSkillNames.map((name) => (
+                      <div
+                        key={`pending:${name}`}
+                        className="edit-modal-bank-row"
+                      >
+                        <span>
+                          {name} <span style={{ opacity: 0.6 }}>(pending)</span>
+                        </span>
+                        <button
+                          className="icon-btn danger"
+                          onClick={() =>
+                            setPendingSkillNames((prev) =>
+                              prev.filter((x) => x !== name),
+                            )
+                          }
+                          aria-label="Remove"
                         >
                           <FiTrash2 size={16} />
                         </button>
@@ -320,6 +450,13 @@ export default function EditCourseMappingModal({
                 {/* Competencies */}
                 <div className="edit-modal-column">
                   <h3>Competencies</h3>
+
+                  <input
+                    className="edit-modal-search"
+                    value={competencySearch}
+                    onChange={(e) => setCompetencySearch(e.target.value)}
+                    placeholder="Search competencies"
+                  />
 
                   <div className="edit-modal-list">
                     {filteredCompetencies.length === 0 && (

@@ -4,7 +4,8 @@ import { supabase } from "../Database/supabaseClient.js";
 export async function getCourseMappings(courseId: number) {
   const { data, error } = await supabase
     .from("Courses_Skill_Mapping")
-    .select("Skills(Skill_name, Type, Description)")
+    // Description removed — names only
+    .select("Skills(Skill_name, Type)")
     .eq("Course_Id", courseId);
 
   if (error) throw new Error(error.message);
@@ -21,7 +22,7 @@ export async function getCourseMappings(courseId: number) {
     if (type === true) {
       if (skill.Skill_name) competencies.push(skill.Skill_name);
     } else {
-      if (skill.Description) skills.push(skill.Description);
+      if (skill.Skill_name) skills.push(skill.Skill_name);
     }
   }
 
@@ -55,4 +56,34 @@ export async function deleteMappingsBySkillId(skillId: number) {
     .eq("Skill_Id", skillId);
 
   if (del.error) throw new Error(del.error.message);
+}
+
+export async function isCourseFullyMapped(courseId: number) {
+  const { data, error } = await supabase
+    .from("Courses_Skill_Mapping")
+    .select(
+      `
+      Skill_Id,
+      Skills(Type)
+    `,
+    )
+    .eq("Course_Id", courseId);
+
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return false;
+
+  let hasSkill = false;
+  let hasCompetency = false;
+
+  for (const row of data as any[]) {
+    // Skills is coming back as an array
+    const type = row.Skills?.[0]?.Type;
+
+    if (type === false) hasSkill = true; // Skill
+    if (type === true) hasCompetency = true; // Competency
+
+    if (hasSkill && hasCompetency) return true;
+  }
+
+  return false;
 }

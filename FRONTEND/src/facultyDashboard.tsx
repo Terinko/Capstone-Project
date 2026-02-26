@@ -10,6 +10,7 @@ import "./FacultyDashboard.css";
 import "./StudentDashboard.css";
 import Navbar from "./Navbar";
 import CourseCard from "./components/CourseCard";
+import AutofillSkillBox from "./AutofillTextBox";
 
 /* ---------- Types & Data from Student Dashboard ------------------------- */
 type MajorOption = string; // Relaxed type to allow dynamic DB values
@@ -78,7 +79,6 @@ const FacultyDashboard: React.FC = () => {
         const result = await response.json();
         setMajorClasses(result);
 
-        // Optional: If the currently selected major isn't in the fetched list, select the first one
         const keys = Object.keys(result);
         if (keys.length > 0 && !keys.includes(selectedMajor)) {
           setSelectedMajor(keys[0]);
@@ -88,7 +88,73 @@ const FacultyDashboard: React.FC = () => {
       }
     };
 
+    //  NEW: log faculty backend routes
+    const logFacultyRoutes = async () => {
+      try {
+        const facultyId = 34; // TODO: replace with real faculty id later
+
+        // 1) editable courses response
+        const coursesRes = await fetch(
+          `http://localhost:3001/api/faculty/courses?facultyId=${facultyId}`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+
+        const coursesJson = await coursesRes.json();
+        console.log("FACULTY /api/faculty/courses status:", coursesRes.status);
+        console.log("FACULTY /api/faculty/courses JSON:", coursesJson);
+
+        // 2) skills + competencies options response
+        const optsRes = await fetch(
+          "http://localhost:3001/api/faculty/skills-options",
+          {
+            method: "GET",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+
+        const optsJson = await optsRes.json();
+        console.log(
+          "FACULTY /api/faculty/skills-options status:",
+          optsRes.status,
+        );
+        console.log("FACULTY /api/faculty/skills-options JSON:", optsJson);
+
+        // 3) OPTIONAL: log mapping for the first returned course
+        if (Array.isArray(coursesJson) && coursesJson.length > 0) {
+          const firstCourseId = coursesJson[0].id;
+
+          const mapRes = await fetch(
+            `http://localhost:3001/api/faculty/courses/${firstCourseId}/mapping?facultyId=${facultyId}`,
+            {
+              method: "GET",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+
+          const mapJson = await mapRes.json();
+          console.log(
+            "FACULTY /api/faculty/courses/:id/mapping status:",
+            mapRes.status,
+          );
+          console.log(
+            "FACULTY /api/faculty/courses/:id/mapping JSON:",
+            mapJson,
+          );
+        }
+      } catch (err) {
+        console.error("Faculty route logging failed:", err);
+      }
+    };
+
     fetchMajorClasses();
+    logFacultyRoutes();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
@@ -175,14 +241,9 @@ const FacultyDashboard: React.FC = () => {
                 )}
               </div>
 
-              <textarea
-                className="textbox"
-                placeholder="Skills (e.g., React, SQL, Agile)"
+              <AutofillSkillBox
                 value={courseSkills}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                  setCourseSkills(e.target.value)
-                }
-                style={{ ...styles.input, height: 60 }}
+                onChange={setCourseSkills}
               />
               <textarea
                 className="textbox"

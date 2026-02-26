@@ -8,6 +8,8 @@ import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
 import { authProfileRouter } from "./Routers/AuthProfileRouter.js";
 import { forgotPasswordRouter } from "./Routers/ForgotPasswordRouter.js"; // ← NEW
+import { autofillRouter } from "./Routers/AutofillRouter.js";
+import { facultyCoursesRouter } from "./Routers/FacultyCourseRouter.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -26,7 +28,9 @@ app.use("/api/auth", forgotPasswordRouter); // ← NEW: forgot-password, verify-
 
 // Protected routes
 app.use("/api/auth", RequireAuth, authProfileRouter);
+app.use("/api/faculty", facultyCoursesRouter);
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
+app.use("/api/autofill", autofillRouter);
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 

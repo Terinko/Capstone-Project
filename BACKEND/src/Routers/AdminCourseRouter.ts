@@ -1,15 +1,13 @@
 import { Router, type Request, type Response } from "express";
-import { getAllCourses } from "../Models/CoursesModel.js";
+import { getAllCourses, updateCourse } from "../Models/CoursesModel.js";
 import {
   getCourseMappings,
   replaceCourseMappings,
-  deleteMappingsBySkillId,
 } from "../Models/CourseSkillMappingModel.js";
 import {
   getAllSkillsAndCompetencies,
-  createSkillWithDescription,
-  findSkillByDescription,
-  deleteSkillById,
+  createSkillWithName,
+  findSkillByName,
 } from "../Models/SkillsModel.js";
 
 export const adminCoursesRouter = Router();
@@ -36,6 +34,7 @@ adminCoursesRouter.get("/courses", async (req: Request, res: Response) => {
           id: c.Course_Id,
           course: c.Course_Code,
           major: c.Major,
+          professor: c.Professor ?? "",
           completion,
           skills,
           competencies,
@@ -142,27 +141,27 @@ adminCoursesRouter.get(
 
 /**
  * POST /api/admin/skills
- * Body: { description: string }
- * Creates a new skill with Skill_name="Skill", Type=false, Description=user text
+ * Body: { name: string }
+ * Creates a new skill with Skill_name=user text, Type=false
  */
 adminCoursesRouter.post("/skills", async (req: Request, res: Response) => {
   try {
-    const description = (req.body?.description as string | undefined)?.trim();
+    const name = (req.body?.name as string | undefined)?.trim();
 
-    if (!description) {
-      return res.status(400).json({ error: "Description is required" });
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
     }
 
     // safeguard: block duplicates (skills only)
-    const existing = await findSkillByDescription(description);
+    const existing = await findSkillByName(name);
     if (existing) {
       return res.status(409).json({
-        error: "Skill description already exists",
+        error: "Skill name already exists",
         existing,
       });
     }
 
-    const created = await createSkillWithDescription(description);
+    const created = await createSkillWithName(name);
     res.status(201).json(created);
   } catch (e: any) {
     console.error("POST /api/admin/skills failed:", e);
@@ -170,25 +169,63 @@ adminCoursesRouter.post("/skills", async (req: Request, res: Response) => {
   }
 });
 
+// Skills should NOT be deleted anymore.
 adminCoursesRouter.delete(
   "/skills/:skillId",
-  async (req: Request, res: Response) => {
+  async (_req: Request, res: Response) => {
+    return res.status(405).json({
+      error:
+        "Deleting Skills is disabled. Update a course's mapping (PUT /courses/:courseId/mapping) to remove skills from that course.",
+    });
+  },
+);
+
+/**
+ * PUT /api/admin/courses/:courseId
+ * Body: { professor?: string, courseCode?: string, courseName?: string, major?: string }
+ * Allows editing Professor (and other course fields if needed).
+ */
+type UpdateCourseBody = {
+  professor?: string;
+  courseCode?: string;
+  courseName?: string;
+  major?: string;
+};
+
+adminCoursesRouter.put(
+  "/courses/:courseId",
+  async (
+    req: Request<{ courseId: string }, unknown, UpdateCourseBody>,
+    res: Response,
+  ) => {
     try {
-      const skillId = Number(req.params.skillId);
-      if (!Number.isInteger(skillId) || skillId <= 0) {
-        return res.status(400).json({ error: "Invalid skillId" });
+      const courseId = Number(req.params.courseId);
+      if (!Number.isInteger(courseId) || courseId <= 0) {
+        return res.status(400).json({ error: "Invalid courseId" });
       }
 
-      // 1) remove mappings first
-      await deleteMappingsBySkillId(skillId);
+      // Build updates without undefined fields (required for exactOptionalPropertyTypes)
+      const updates: UpdateCourseBody = {};
 
-      // 2) delete the skill row
-      await deleteSkillById(skillId);
+      if (typeof req.body.professor === "string") {
+        updates.professor = req.body.professor.trim();
+      }
+      if (typeof req.body.courseCode === "string") {
+        updates.courseCode = req.body.courseCode.trim();
+      }
+      if (typeof req.body.courseName === "string") {
+        updates.courseName = req.body.courseName.trim();
+      }
+      if (typeof req.body.major === "string") {
+        updates.major = req.body.major.trim();
+      }
 
-      res.json({ ok: true });
-    } catch (e: any) {
-      console.error("DELETE /api/admin/skills/:skillId failed:", e);
-      res.status(500).json({ error: e?.message ?? "Unknown error" });
+      const updated = await updateCourse(courseId, updates);
+
+      res.json(updated);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      res.status(500).json({ error: msg });
     }
   },
 );

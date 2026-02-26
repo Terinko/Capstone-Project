@@ -140,14 +140,43 @@
   min-height: 80px;
 }
 
-/* Center the create-skill card */
-.edit-modal-create-center {
-  display: flex;
-  justify-content: center;
+.edit-modal-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
 }
 
-.create-skill-card {
-  width: min(650px, 100%);
+.edit-modal-top-row .edit-modal-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-modal-top-row .edit-modal-input {
+  margin-top: 10px;
+}
+
+.create-skill-card .edit-modal-card-actions {
+  margin-top: auto;
+}
+
+@media (max-width: 800px) {
+  .edit-modal-top-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .edit-modal-top-row {
+    flex-direction: column;
+  }
+
+  .create-skill-card,
+  .professor-card {
+    flex: unset;
+    width: 100%;
+  }
 }
 
 .edit-modal-card-actions {
