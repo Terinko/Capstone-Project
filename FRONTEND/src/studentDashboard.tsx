@@ -34,7 +34,6 @@ interface Skill {
   Skill_Id: string;
   Skill_Name: string;
   Type: boolean;
-  Description: string;
 }
 
 const StudentDashboard: React.FC = () => {
@@ -128,7 +127,6 @@ const StudentDashboard: React.FC = () => {
           Skill_Id: getVal(s, "Skill_Id"),
           Skill_Name: getVal(s, "Skill_name"),
           Type: getVal(s, "Type"),
-          Description: getVal(s, "Description"),
         }));
 
         const skillsLookup: Record<string, Skill[]> = {};
@@ -197,7 +195,7 @@ Transform these into strong, action-oriented resume bullet points, grouped by co
 ${classBlocks}
 
 Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a semicolon (e.g., "SER-491:").
+1. Output each course as a labeled section header using only alphabetical and numeric characters and a (e.g., "SER-491:").
 2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
 3. Consolidate related skills within the same course where appropriate.
 4. Do not include any markdown formatting (like **bold**).
@@ -265,7 +263,7 @@ Requirements:
 
       if (lookupId && courseSkills[lookupId]) {
         const descriptions = courseSkills[lookupId]
-          .map((skill) => skill.Description)
+          .map((skill) => skill.Skill_Name)
           .filter(Boolean);
         if (descriptions.length > 0) {
           skillsByClass[classObj.label] = descriptions;
@@ -281,7 +279,7 @@ Requirements:
     if (showRawSkills) {
       // Show raw skills grouped by course for the tech demo
       const flat = Object.entries(skillsByClass).flatMap(([course, skills]) => [
-        `--- ${course} ---`,
+        `${course}:`,
         ...skills,
       ]);
       setBullets(flat);
