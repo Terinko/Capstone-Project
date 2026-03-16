@@ -43,6 +43,8 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
   apiFetch: <T>(path: string, init?: RequestInit) => Promise<T>;
+  /** Base path for course mapping endpoints. Defaults to /api/admin */
+  mappingBasePath?: string;
 };
 
 export default function EditCourseMappingModal({
@@ -54,6 +56,7 @@ export default function EditCourseMappingModal({
   onClose,
   onSaved,
   apiFetch,
+  mappingBasePath = "/api/admin",
 }: Props) {
   /* -------------------- UI state -------------------- */
   const [loading, setLoading] = useState(false);
@@ -97,7 +100,7 @@ export default function EditCourseMappingModal({
             `/api/autofill/skills-dataset?scope=all&major=${encodeURIComponent(major)}`,
           ),
           apiFetch<CourseMappingResponse>(
-            `/api/admin/courses/${courseId}/mapping`,
+            `${mappingBasePath}/courses/${courseId}/mapping`,
           ),
         ]);
 
@@ -305,7 +308,7 @@ export default function EditCourseMappingModal({
         skillIds: mergedSkillIds,
         competencyIds: selectedCompetencyIds,
       }),
-        await apiFetch(`/api/admin/courses/${courseId}/mapping`, {
+        await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
           method: "PUT",
           body: JSON.stringify({
             skillIds: mergedSkillIds,

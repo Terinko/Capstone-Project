@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 // Updated import to match the local file structure
 import { supabase } from "../supabaseClient";
 // Assumed relative imports for other components
@@ -24,10 +24,16 @@ type MajorOption =
   | "Mechanical Engineering"
   | "Industrial Engineering";
 
+// One entry per unique Course_Code within a major.
+// offerings holds every DB row that shares that code (one per version).
+interface CourseOffering {
+  id: string; // DB Course_Id for this specific row
+  altName: string | null;
+}
+
 interface ClassOption {
-  id: string; // This is now the DB Course_Id (as string)
-  label: string; // This is the Course_Code
-  courseId?: string; // This is the Course_Code (kept for compatibility)
+  courseCode: string; // e.g. "SER-301"  (was label / courseId)
+  offerings: CourseOffering[];
 }
 
 interface Skill {
@@ -38,7 +44,12 @@ interface Skill {
 
 const StudentDashboard: React.FC = () => {
   const [major, setMajor] = useState<MajorOption>("Software Engineering");
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  // checkedCodes: set of Course_Codes the student has ticked
+  const [checkedCodes, setCheckedCodes] = useState<Set<string>>(new Set());
+  // versionSelections: { [courseCode]: Course_Id } — which version row to use
+  const [versionSelections, setVersionSelections] = useState<
+    Record<string, string>
+  >({});
   const [bullets, setBullets] = useState<string[]>([]);
   const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
 
@@ -71,8 +82,32 @@ const StudentDashboard: React.FC = () => {
     fetchMajorClasses();
   }, []);
 
-  const availableClasses =
-    majorClasses && majorClasses[major] ? majorClasses[major] : [];
+  const availableClasses = useMemo(() => {
+    const baseClasses =
+      majorClasses && majorClasses[major] ? majorClasses[major] : [];
+
+    return baseClasses.map((course) => {
+      // 1. Check if this course has at least one valid alternate name
+      const hasAlternate = course.offerings.some(
+        (o) => o.altName && o.altName.trim() !== "",
+      );
+
+      // 2. If it has alternates, filter out the 'null' (Standard) ones entirely
+      let filteredOfferings = hasAlternate
+        ? course.offerings.filter((o) => o.altName && o.altName.trim() !== "")
+        : course.offerings;
+
+      // 3. Deduplicate by altName so the UI doesn't render multiple identical pills
+      // (e.g., if there are multiple "Standard" rows in the DB for the same course)
+      filteredOfferings = Array.from(
+        new Map(
+          filteredOfferings.map((o) => [o.altName?.trim() || "Standard", o]),
+        ).values(),
+      );
+
+      return { ...course, offerings: filteredOfferings };
+    });
+  }, [majorClasses, major]);
 
   // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
   useEffect(() => {
@@ -85,11 +120,13 @@ const StudentDashboard: React.FC = () => {
       setIsLoadingSkills(true);
 
       try {
-        const validNumericIds = availableClasses
-          .map((c) => Number(c.id))
+        // Collect every Course_Id across all offerings so we can fetch
+        // skill mappings for all rows up front, regardless of selection state.
+        const allOfferingIds = availableClasses
+          .flatMap((c) => c.offerings.map((o) => Number(o.id)))
           .filter((n) => !isNaN(n) && n > 0);
 
-        if (validNumericIds.length === 0) {
+        if (allOfferingIds.length === 0) {
           setCourseSkills({});
           setIsLoadingSkills(false);
           return;
@@ -98,7 +135,7 @@ const StudentDashboard: React.FC = () => {
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
-          .in("Course_Id", validNumericIds);
+          .in("Course_Id", allOfferingIds);
 
         if (mappingsError) throw mappingsError;
 
@@ -118,9 +155,12 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
+        // Map every individual offering id → its courseCode
         const idToCodeMap: Record<number, string> = {};
         availableClasses.forEach((c) => {
-          idToCodeMap[Number(c.id)] = c.courseId!;
+          c.offerings.forEach((o) => {
+            idToCodeMap[Number(o.id)] = c.courseCode;
+          });
         });
 
         const allSkills = (skillsData || []).map((s) => ({
@@ -129,29 +169,27 @@ const StudentDashboard: React.FC = () => {
           Type: getVal(s, "Type"),
         }));
 
+        // Build lookup keyed by Course_Id (string) so handleGenerate can
+        // pull skills for whichever specific version row was selected.
         const skillsLookup: Record<string, Skill[]> = {};
 
         mappingsData.forEach((mapping) => {
           const mCourseId = getVal(mapping, "Course_Id");
           const mSkillId = getVal(mapping, "Skill_Id");
+          const key = String(mCourseId);
 
-          const courseCodeStr = idToCodeMap[mCourseId];
+          const skillDetail = allSkills.find(
+            (s) => String(s.Skill_Id) === String(mSkillId),
+          );
 
-          if (courseCodeStr) {
-            const skillDetail = allSkills.find(
-              (s) => String(s.Skill_Id) === String(mSkillId),
-            );
-            if (skillDetail) {
-              if (!skillsLookup[courseCodeStr]) {
-                skillsLookup[courseCodeStr] = [];
-              }
-              if (
-                !skillsLookup[courseCodeStr].some(
-                  (s) => s.Skill_Id === skillDetail.Skill_Id,
-                )
-              ) {
-                skillsLookup[courseCodeStr].push(skillDetail);
-              }
+          if (skillDetail) {
+            if (!skillsLookup[key]) skillsLookup[key] = [];
+            if (
+              !skillsLookup[key].some(
+                (s) => s.Skill_Id === skillDetail.Skill_Id,
+              )
+            ) {
+              skillsLookup[key].push(skillDetail);
             }
           }
         });
@@ -170,11 +208,40 @@ const StudentDashboard: React.FC = () => {
     loadSkillsForClasses();
   }, [major, majorClasses]);
 
-  const handleClassToggle = (id: string) => {
-    setSelectedClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  const toggleCourse = (courseCode: string) => {
+    setCheckedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseCode)) {
+        next.delete(courseCode);
+        setVersionSelections((o) => {
+          const n = { ...o };
+          delete n[courseCode];
+          return n;
+        });
+      } else {
+        next.add(courseCode);
+      }
+      return next;
+    });
+    setBullets([]);
   };
+
+  const selectVersion = (courseCode: string, offeringId: string) => {
+    setVersionSelections((prev) => ({ ...prev, [courseCode]: offeringId }));
+    setBullets([]);
+  };
+
+  // Returns the resolved Course_Id for a checked course:
+  // auto-resolves when there is only one offering, otherwise uses selection.
+  const getResolvedId = (course: ClassOption): string | null => {
+    if (!checkedCodes.has(course.courseCode)) return null;
+    if (course.offerings.length === 1) return course.offerings[0].id;
+    return versionSelections[course.courseCode] ?? null;
+  };
+
+  const needsSectionCount = availableClasses.filter(
+    (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
+  ).length;
 
   const generateWithGemma = async (skillsByClass: Record<string, string[]>) => {
     setIsLoading(true);
@@ -246,28 +313,23 @@ Requirements:
       return;
     }
 
-    if (selectedClasses.length === 0) {
+    if (checkedCodes.size === 0) {
       setBullets(["Select at least one class to generate bullet points."]);
       return;
     }
 
-    const selectedClassObjects = availableClasses.filter((c) =>
-      selectedClasses.includes(c.id),
-    );
-
-    // Build a map of { courseLabel -> skill descriptions[] } to preserve class context
+    // Build { courseCode -> skill descriptions[] } using the resolved Course_Id
     const skillsByClass: Record<string, string[]> = {};
 
-    selectedClassObjects.forEach((classObj) => {
-      const lookupId = classObj.courseId;
+    availableClasses.forEach((course) => {
+      const resolvedId = getResolvedId(course);
+      if (!resolvedId) return; // unchecked or still needs version selection
 
-      if (lookupId && courseSkills[lookupId]) {
-        const descriptions = courseSkills[lookupId]
+      const skills = courseSkills[resolvedId];
+      if (skills && skills.length > 0) {
+        skillsByClass[course.courseCode] = skills
           .map((skill) => skill.Skill_Name)
           .filter(Boolean);
-        if (descriptions.length > 0) {
-          skillsByClass[classObj.label] = descriptions;
-        }
       }
     });
 
@@ -279,7 +341,7 @@ Requirements:
     if (showRawSkills) {
       // Show raw skills grouped by course for the tech demo
       const flat = Object.entries(skillsByClass).flatMap(([course, skills]) => [
-        `${course}:`,
+        `${course}:\n`,
         ...skills,
       ]);
       setBullets(flat);
@@ -330,7 +392,8 @@ Requirements:
                 onChange={(e) => {
                   const newMajor = e.target.value as MajorOption;
                   setMajor(newMajor);
-                  setSelectedClasses([]);
+                  setCheckedCodes(new Set());
+                  setVersionSelections({});
                   setBullets([]);
                   setErrorMsg(null);
                 }}
@@ -360,16 +423,71 @@ Requirements:
                 </p>
               ) : availableClasses && availableClasses.length > 0 ? (
                 <div className="class-grid">
-                  {availableClasses.map((c) => (
-                    <label key={c.id} className="class-option">
-                      <input
-                        type="checkbox"
-                        checked={selectedClasses.includes(c.id)}
-                        onChange={() => handleClassToggle(c.id)}
-                      />
-                      <span>{c.label}</span>
-                    </label>
-                  ))}
+                  {availableClasses.map((course) => {
+                    const isChecked = checkedCodes.has(course.courseCode);
+                    const hasMany = course.offerings.length > 1;
+                    const resolvedId = getResolvedId(course);
+                    const needsPick =
+                      isChecked && hasMany && resolvedId === null;
+
+                    return (
+                      <div
+                        key={course.courseCode}
+                        style={{ display: "contents" }}
+                      >
+                        <label
+                          className={`class-option${isChecked ? " checked" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleCourse(course.courseCode)}
+                          />
+                          <span>{course.courseCode}</span>
+                          {needsPick && (
+                            <span
+                              style={{
+                                color: "#f59e0b",
+                                fontWeight: 700,
+                                marginLeft: 2,
+                              }}
+                            >
+                              !
+                            </span>
+                          )}
+                        </label>
+
+                        {/* Version sub-row — only when checked and >1 offering */}
+                        {isChecked && hasMany && (
+                          <div className="offering-sub-row">
+                            <span className="offering-sub-label">
+                              Which version?
+                            </span>
+                            {course.offerings.map((offering) => {
+                              const isSelected =
+                                versionSelections[course.courseCode] ===
+                                offering.id;
+                              return (
+                                <button
+                                  key={offering.id}
+                                  type="button"
+                                  className={`offering-pill${isSelected ? " selected" : ""}`}
+                                  onClick={() =>
+                                    selectVersion(
+                                      course.courseCode,
+                                      offering.id,
+                                    )
+                                  }
+                                >
+                                  {offering.altName ?? "Standard"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p
@@ -377,6 +495,22 @@ Requirements:
                   style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
                 >
                   No classes found for this major.
+                </p>
+              )}
+
+              {needsSectionCount > 0 && (
+                <p
+                  style={{
+                    marginTop: "0.75rem",
+                    fontSize: "0.8rem",
+                    color: "#f59e0b",
+                    fontWeight: 600,
+                  }}
+                >
+                  ⚠ {needsSectionCount} selected course
+                  {needsSectionCount > 1 ? "s" : ""} still need
+                  {needsSectionCount === 1 ? "s" : ""} a version selected before
+                  generating.
                 </p>
               )}
             </div>
@@ -413,7 +547,7 @@ Requirements:
                 type="button"
                 className={`btn-generate ${isLoading ? "btn-loading" : ""}`}
                 onClick={handleGenerate}
-                disabled={isLoading || isLoadingSkills}
+                disabled={isLoading || isLoadingSkills || needsSectionCount > 0}
               >
                 {isLoading ? "Generating..." : "Generate with AI"}
               </button>
