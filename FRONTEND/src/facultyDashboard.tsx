@@ -339,7 +339,7 @@ const FacultyDashboard: React.FC = () => {
 
         {/* ── Unassigned Courses (collapsible) ── */}
         {!loading && !error && (
-          <section className="admin-table-card" style={{ marginTop: 16 }}>
+          <section className="admin-table-card" style={{ marginTop: 24 }}>
             {/* Toggle header */}
             <button
               type="button"
@@ -349,49 +349,76 @@ const FacultyDashboard: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "12px 16px",
-                background: "transparent",
+                padding: "16px 20px",
+                background: unassignedOpen ? "#f8fafc" : "#ffffff",
                 border: "none",
+                borderBottom: unassignedOpen ? "1px solid #e2e8f0" : "none",
                 cursor: "pointer",
                 textAlign: "left",
+                transition: "background-color 0.2s ease",
               }}
+              onMouseOver={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f1f5f9")
+              }
+              onMouseOut={(e) =>
+                (e.currentTarget.style.backgroundColor = unassignedOpen
+                  ? "#f8fafc"
+                  : "#ffffff")
+              }
             >
               <span
                 style={{
                   fontWeight: 600,
                   color: "#1e293b",
-                  fontSize: "0.95rem",
+                  fontSize: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
                 }}
               >
                 Unassigned Courses
                 {filteredUnassignedRows.length > 0 && (
                   <span
                     style={{
-                      marginLeft: 8,
                       fontSize: "0.75rem",
                       fontWeight: 700,
-                      background: "#f1f5f9",
-                      color: "#64748b",
-                      padding: "2px 8px",
+                      background: "#e2e8f0",
+                      color: "#475569",
+                      padding: "4px 10px",
                       borderRadius: 999,
                     }}
                   >
-                    {filteredUnassignedRows.length}
+                    {filteredUnassignedRows.length} available
                   </span>
                 )}
               </span>
-              <i
-                className={`bi bi-chevron-${unassignedOpen ? "up" : "down"}`}
-                style={{ color: "#94a3b8", fontSize: "0.85rem" }}
-              />
+
+              {/* Very Obvious Toggle Icon Area */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#64748b",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
+                }}
+              >
+                <span>{unassignedOpen ? "Hide" : "Show"}</span>
+                <i
+                  className={`bi bi-chevron-${unassignedOpen ? "up" : "down"}`}
+                  style={{
+                    color: "#475569",
+                    fontSize: "1.2rem",
+                    strokeWidth: "1px",
+                  }}
+                />
+              </div>
             </button>
 
             {/* Table — rendered when open, data always fetched */}
             {unassignedOpen && (
-              <div
-                className="admin-table"
-                style={{ borderTop: "1px solid #e2e8f0" }}
-              >
+              <div className="admin-table">
                 <div className="admin-table-row admin-table-header">
                   <div className="admin-cell admin-cell-course">Course</div>
                   <div className="admin-cell admin-cell-professor">
@@ -419,8 +446,39 @@ const FacultyDashboard: React.FC = () => {
                         </div>
                       )}
                     </div>
+                    {/* CLAIM BUTTON MOVED HERE */}
                     <div className="admin-cell admin-cell-professor">
-                      <span className="muted">—</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: "#131d43",
+                          color: "#ffffff",
+                          border: "none",
+                          padding: "6px 14px",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                        }}
+                        onClick={async () => {
+                          try {
+                            await apiFetch(
+                              `/api/faculty/courses/${row.id}/claim`,
+                              { method: "PUT" },
+                            );
+                            setRefreshKey((k) => k + 1);
+                          } catch (err) {
+                            alert(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to claim course",
+                            );
+                          }
+                        }}
+                      >
+                        I Teach This Course
+                      </button>
                     </div>
                     <div className="admin-cell admin-cell-skills">
                       {row.skills.length > 0 ? (
@@ -446,16 +504,6 @@ const FacultyDashboard: React.FC = () => {
                             No competencies mapped yet
                           </span>
                         )}
-                        <button
-                          type="button"
-                          className="edit-icon-button"
-                          aria-label={`Edit mapping for ${row.course}`}
-                          onClick={() =>
-                            setEditing({ id: row.id, code: row.course })
-                          }
-                        >
-                          <i className="bi bi-pencil-square"></i>
-                        </button>
                       </div>
                     </div>
                   </div>

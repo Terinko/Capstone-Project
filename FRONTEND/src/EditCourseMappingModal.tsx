@@ -72,7 +72,6 @@ export default function EditCourseMappingModal({
   );
 
   /* -------------------- Form state -------------------- */
-  const [professorDraft, setProfessorDraft] = useState("");
   const [newSkillName, setNewSkillName] = useState("");
   const [competencySearch, setCompetencySearch] = useState("");
   const [pendingSkillNames, setPendingSkillNames] = useState<string[]>([]);
@@ -84,7 +83,6 @@ export default function EditCourseMappingModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    setProfessorDraft(professor ?? "");
     setPendingSkillNames([]);
 
     let cancelled = false;
@@ -179,17 +177,6 @@ export default function EditCourseMappingModal({
   }, [options, newSkillName, selectedSkillIds, pendingSkillNames]);
 
   /**
-   * Refresh skills/competencies after creating or deleting a skill.
-   */
-  async function refreshOptions() {
-    const opts = await apiFetch<SkillsOptionsResponse>(
-      `/api/autofill/skills-dataset?scope=all&major=${encodeURIComponent(major)}`,
-    );
-    setOptions(opts);
-    return opts;
-  }
-
-  /**
    * Create a new Skill using the provided description.
    * If the backend reports it already exists, reuse it.
    */
@@ -250,14 +237,6 @@ export default function EditCourseMappingModal({
       setSaving(true);
       setError(null);
 
-      // Save professor changes (if any) BEFORE saving the mapping
-      if ((professorDraft ?? "") !== (professor ?? "")) {
-        await apiFetch(`/api/admin/courses/${courseId}`, {
-          method: "PUT",
-          body: JSON.stringify({ professor: professorDraft }),
-        });
-      }
-
       // 1) Create any pending skills in the DB *now* (on Save)
       let newSkillIds: number[] = [];
 
@@ -304,17 +283,14 @@ export default function EditCourseMappingModal({
         new Set([...selectedSkillIds, ...newSkillIds]),
       );
 
-      body: (JSON.stringify({
-        skillIds: mergedSkillIds,
-        competencyIds: selectedCompetencyIds,
-      }),
-        await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
-          method: "PUT",
-          body: JSON.stringify({
-            skillIds: mergedSkillIds,
-            competencyIds: selectedCompetencyIds,
-          }),
-        }));
+      // 2) Update the mapping
+      await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
+        method: "PUT",
+        body: JSON.stringify({
+          skillIds: mergedSkillIds,
+          competencyIds: selectedCompetencyIds,
+        }),
+      });
 
       setPendingSkillNames([]);
       onSaved();
@@ -359,7 +335,7 @@ export default function EditCourseMappingModal({
             <div className="edit-modal-loading">Loading…</div>
           ) : (
             <>
-              {/* Top row: Create Skill (left) + Professor (right) */}
+              {/* Top row: Create Skill (left) + Course Details (right) */}
               <div className="edit-modal-top-row">
                 <div className="edit-modal-card create-skill-card">
                   <div className="edit-modal-card-title">Create Skill</div>
@@ -389,15 +365,33 @@ export default function EditCourseMappingModal({
                   </div>
                 </div>
 
-                <div className="edit-modal-card professor-card">
-                  <div className="edit-modal-card-title">Professor</div>
+                <div className="edit-modal-card details-card">
+                  <div className="edit-modal-card-title">Course Details</div>
 
-                  <input
-                    className="edit-modal-input"
-                    value={professorDraft}
-                    onChange={(e) => setProfessorDraft(e.target.value)}
-                    placeholder="Professor name"
-                  />
+                  <div style={{ marginBottom: "10px" }}></div>
+
+                  <div>
+                    <label
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "#64748b",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Professor
+                    </label>
+                    <input
+                      className="edit-modal-input"
+                      value={professor || "Unassigned"}
+                      disabled
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        color: "#94a3b8",
+                        cursor: "not-allowed",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
