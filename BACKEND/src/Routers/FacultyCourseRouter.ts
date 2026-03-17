@@ -10,6 +10,7 @@ import {
   getVisibleCoursesForFaculty,
   getUnassignedCourses,
 } from "../Models/FacultyCoursesModel.js";
+import { updateCourse } from "../Models/CoursesModel.js";
 
 export const facultyCoursesRouter = Router();
 
@@ -27,9 +28,9 @@ function getFacultyId(req: Request): number {
 /**
  * GET /api/faculty/courses?status=
  * Returns courses visible to this faculty member:
- *   - courses they own via Faculty_Courses
- *   - courses with no professor assigned
- *   - courses whose Professor field matches their full name
+ * - courses they own via Faculty_Courses
+ * - courses with no professor assigned
+ * - courses whose Professor field matches their full name
  * Rows with a null Course_Name_Alt are hidden when sibling rows for the
  * same Course_Code have a non-null Course_Name_Alt.
  */
@@ -197,6 +198,54 @@ facultyCoursesRouter.put(
       await replaceCourseMappings(courseId, uniqueIds);
 
       const updated = await getCourseMappings(courseId);
+      res.json(updated);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      res.status(500).json({ error: msg });
+    }
+  },
+);
+
+/**
+ * PUT /api/faculty/courses/:courseId/claim
+ * Allows a faculty member to claim an unassigned course.
+ */
+facultyCoursesRouter.put(
+  "/courses/:courseId/claim",
+  async (req: Request, res: Response) => {
+    try {
+      const facultyId = getFacultyId(req);
+      if (!Number.isFinite(facultyId)) {
+        return res
+          .status(400)
+          .json({ error: "Missing or invalid faculty session" });
+      }
+
+      const courseId = Number(req.params.courseId);
+      if (!Number.isInteger(courseId) || courseId <= 0) {
+        return res.status(400).json({ error: "Invalid courseId" });
+      }
+
+      // Ensure the course is currently unassigned to prevent stealing courses
+      const unassignedCourses = await getUnassignedCourses();
+      const isUnassigned = unassignedCourses.some(
+        (c) => c.Course_Id === courseId,
+      );
+
+      if (!isUnassigned) {
+        return res
+          .status(403)
+          .json({ error: "Course is already assigned or unavailable" });
+      }
+
+      // Fetch the faculty's full name
+      const facultyFullName = await getFacultyName(facultyId);
+
+      // Update the course using the existing updateCourse model function
+      const updated = await updateCourse(courseId, {
+        professor: facultyFullName,
+      });
+
       res.json(updated);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
