@@ -450,14 +450,6 @@ export default function EditCourseMappingModal({
                 {/* Competencies */}
                 <div className="edit-modal-column">
                   <h3>Competencies</h3>
-
-                  <input
-                    className="edit-modal-search"
-                    value={competencySearch}
-                    onChange={(e) => setCompetencySearch(e.target.value)}
-                    placeholder="Search competencies"
-                  />
-
                   <div className="edit-modal-list">
                     {filteredCompetencies.length === 0 && (
                       <div className="edit-modal-empty">

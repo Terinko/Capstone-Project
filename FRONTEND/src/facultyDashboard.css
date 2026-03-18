@@ -1,9 +1,173 @@
 .facultyForm {
-    display: "flex";
-    flex-direction: "row";
-    gap: 10;
+  display: "flex";
+  flex-direction: "row";
+  gap: 10;
 }
 
 .textbox {
-    background-color: white;
+  background-color: white;
+}
+
+.faculty-table-row {
+  grid-template-columns: 1fr 1.2fr 1.4fr;
+}
+
+/* Form spacing stays vertical */
+.faculty-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.faculty-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.faculty-label {
+  font-weight: 700;
+}
+
+/* Make inputs clean + consistent */
+.faculty-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cfcfcf;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+/* Improve focus feel */
+.faculty-input:focus {
+  outline: none;
+  border-color: #0069d9;
+  box-shadow: 0 0 0 2px rgba(0, 105, 217, 0.15);
+}
+
+/* Checkbox grid stays clean */
+.competency-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.competency-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.centered-button {
+  align-self: center;
+}
+
+/* Button styling (slightly nicer) */
+.faculty-submit-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #0069d9;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.faculty-submit-button:hover:not(:disabled) {
+  background: #0053ad;
+}
+
+.faculty-submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-error {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.form-success {
+  color: #067647;
+  font-weight: 600;
+}
+
+/* Skill chips (selected skills) */
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  font-size: 13px;
+}
+
+/* Chip remove button */
+.skill-chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Dropdown container */
+.skill-dropdown {
+  margin-top: 6px;
+  border: 1px solid #cfcfcf;
+  border-radius: 8px;
+  background: #fff;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Dropdown items */
+.skill-dropdown-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.skill-dropdown-item:hover {
+  background: #f2f6ff;
+}
+
+/* Improve spacing for chip container */
+.skill-chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 768px) {
+  .faculty-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .competency-checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.skill-no-matches {
+  margin-top: 8px;
+  opacity: 0.8;
+  font-size: 14px;
 }

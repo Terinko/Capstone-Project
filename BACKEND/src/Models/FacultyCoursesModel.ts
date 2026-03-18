@@ -7,15 +7,17 @@ export async function getFacultyCourseIds(facultyId: number) {
     .select("Course_Id")
     .eq("Faculty_Id", facultyId);
 
+  console.log("getFacultyCourseIds raw data:", data);
+  console.log("getFacultyCourseIds raw error:", error);
+
   if (error) throw new Error(error.message);
 
   return (data ?? [])
-    .map((row: any) => row.Course_Id as number)
-    .filter((id) => typeof id === "number");
+    .map((row: any) => Number(row.Course_Id))
+    .filter((id) => Number.isInteger(id) && id > 0);
 }
 
 // Convenience: return actual course rows for the faculty member
-// (optional, but usually handy)
 export async function getFacultyCourses(facultyId: number) {
   const { data, error } = await supabase
     .from("Faculty_Courses")
@@ -25,4 +27,18 @@ export async function getFacultyCourses(facultyId: number) {
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((row: any) => row.Courses).filter(Boolean);
+}
+
+export async function assignCourseToFaculty(
+  facultyId: number,
+  courseId: number,
+) {
+  const { error } = await supabase.from("Faculty_Courses").insert([
+    {
+      Faculty_Id: facultyId,
+      Course_Id: courseId,
+    },
+  ]);
+
+  if (error) throw new Error(error.message);
 }

@@ -58,3 +58,30 @@ export async function deleteSkillById(_skillId: number) {
     "Deleting Skills rows is disabled. Remove skills from a course by updating the Course_Skill_Mapping on Save.",
   );
 }
+
+export async function findSkillsByNames(names: string[]) {
+  const trimmed = names.map((n) => n.trim()).filter(Boolean);
+
+  if (trimmed.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("Skills")
+    .select("Skill_Id, Skill_name, Type")
+    .eq("Type", false)
+    .in("Skill_name", trimmed);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function findOrCreateSkillByName(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error("Skill name cannot be empty");
+  }
+
+  const existing = await findSkillByName(trimmed);
+  if (existing) return existing;
+
+  return await createSkillWithName(trimmed);
+}

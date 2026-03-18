@@ -1,343 +1,351 @@
-// src/facultyDashboard.tsx
 import React, {
   useState,
   useEffect,
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import Footer from "./footer";
 import "./FacultyDashboard.css";
-import "./StudentDashboard.css";
-import Navbar from "./Navbar";
-import CourseCard from "./components/CourseCard";
 import AutofillSkillBox from "./AutofillTextBox";
 
-/* ---------- Types & Data from Student Dashboard ------------------------- */
-type MajorOption = string; // Relaxed type to allow dynamic DB values
+type MajorOption = string;
 
-interface ClassOption {
-  id: string;
-  label: string;
-  courseId?: string;
+interface SkillOption {
+  Skill_Id: number;
+  Skill_name: string;
+  Type: boolean;
 }
 
-/* ---------- Types ------------------------------------------------------- */
-interface Course {
-  id: number;
-  name: string;
-  skills?: string;
-  competencies?: string;
-}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
-/* ---------- Component ---------------------------------------------------- */
 const FacultyDashboard: React.FC = () => {
-  /* ---------- State -----------------------------------------------------*/
+  const facultyId = 34;
+
+  const MAJOR_PREFIX_MAP: Record<string, string> = {
+    "Software Engineering": "SER",
+    "Computer Science": "CSC",
+    "Mechanical Engineering": "MER",
+    "Industrial Engineering": "IER",
+    "Civil Engineering": "CER",
+  };
+
   const [selectedMajor, setSelectedMajor] = useState<MajorOption>(
     "Software Engineering",
   );
-  const [courseName, setCourseName] = useState("");
+  const [availableMajors, setAvailableMajors] = useState<string[]>([]);
+  const [prefixError, setPrefixError] = useState<string | null>(null);
+
+  const [courseCode, setCourseCode] = useState("");
+  const [courseTitle, setCourseTitle] = useState("");
+  const [alternateCourseTitle, setAlternateCourseTitle] = useState("");
   const [courseSkills, setCourseSkills] = useState("");
-  const [courseCompetencies, setCourseCompetencies] = useState("");
 
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [majorClasses, setMajorClasses] = useState<Record<
-    string,
-    ClassOption[]
-  > | null>(null);
+  const [duplicateCodeFound, setDuplicateCodeFound] = useState(false);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
-  /* ---------- Helpers ---------------------------------------------------*/
-  let nextId = Math.max(...courses.map((c) => c.id), 0) + 1;
+  const [competencyOptions, setCompetencyOptions] = useState<SkillOption[]>([]);
+  const [selectedCompetencyIds, setSelectedCompetencyIds] = useState<number[]>(
+    [],
+  );
 
-  const addCourse = (e: FormEvent) => {
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const parseSkillNames = (value: string): string[] =>
+    value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const toggleCompetency = (id: number) => {
+    setSelectedCompetencyIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const validateCoursePrefix = (code: string, major: string) => {
+    const trimmed = code.trim().toUpperCase();
+
+    if (!trimmed || !major) {
+      setPrefixError(null);
+      return;
+    }
+
+    const expectedPrefix = MAJOR_PREFIX_MAP[major];
+    if (!expectedPrefix) {
+      setPrefixError(null);
+      return;
+    }
+
+    const enteredPrefix = trimmed.split(" ")[0];
+
+    if (enteredPrefix !== expectedPrefix) {
+      setPrefixError(
+        `Course code must start with "${expectedPrefix}" for ${major}.`,
+      );
+    } else {
+      setPrefixError(null);
+    }
+  };
+
+  const checkDuplicateCourseCode = async (code: string) => {
+    const trimmed = code.trim();
+
+    if (!trimmed) {
+      setDuplicateCodeFound(false);
+      setAlternateCourseTitle("");
+      return;
+    }
+
+    try {
+      setCheckingDuplicate(true);
+
+      const params = new URLSearchParams();
+      params.set("courseCode", trimmed);
+
+      const response = await fetch(
+        `${API_BASE}/api/faculty/courses/check-code?${params.toString()}`,
+        {
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "x-faculty-id": String(facultyId),
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to check course code (${response.status})`);
+      }
+
+      const data = await response.json();
+      const isDuplicate = Boolean(data?.exists);
+
+      setDuplicateCodeFound(isDuplicate);
+
+      if (!isDuplicate) {
+        setAlternateCourseTitle("");
+      }
+    } catch (err) {
+      console.error("Duplicate check failed:", err);
+      setDuplicateCodeFound(false);
+    } finally {
+      setCheckingDuplicate(false);
+    }
+  };
+
+  const addCourse = async (e: FormEvent) => {
     e.preventDefault();
-    if (!courseName.trim()) return;
-    setCourses((prev) => [
-      ...prev,
-      {
-        id: nextId++,
-        name: courseName.trim(),
-        skills: courseSkills.trim(),
-        competencies: courseCompetencies.trim(),
-      },
-    ]);
-    // Reset form
-    setCourseName("");
-    setCourseSkills("");
-    setCourseCompetencies("");
+
+    setFormError(null);
+    setFormSuccess(null);
+
+    if (!courseCode.trim() || !courseTitle.trim()) {
+      setFormError("Course code and course title are required.");
+      return;
+    }
+
+    try {
+      setFormSubmitting(true);
+
+      const response = await fetch(`${API_BASE}/api/faculty/courses`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "x-faculty-id": String(facultyId),
+        },
+        body: JSON.stringify({
+          courseCode: courseCode.trim(),
+          courseName: courseTitle.trim(),
+          alternateCourseTitle: duplicateCodeFound
+            ? alternateCourseTitle.trim()
+            : "",
+          major: selectedMajor,
+          skillNames: parseSkillNames(courseSkills),
+          competencyIds: selectedCompetencyIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Failed to add course (${response.status})`);
+      }
+
+      setCourseCode("");
+      setCourseTitle("");
+      setAlternateCourseTitle("");
+      setCourseSkills("");
+      setSelectedCompetencyIds([]);
+      setDuplicateCodeFound(false);
+      setFormSuccess("Course added successfully.");
+    } catch (err) {
+      console.error("Add course failed:", err);
+      setFormError(err instanceof Error ? err.message : "Failed to add course");
+    } finally {
+      setFormSubmitting(false);
+    }
   };
 
-  const handleMajorChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedMajor(e.target.value as MajorOption);
-    setCourseName(""); // Reset course selection when major changes
-  };
-
-  // FIX: Wrap fetch in useEffect to prevent infinite loops
   useEffect(() => {
-    const fetchMajorClasses = async () => {
+    const fetchMajors = async () => {
       try {
-        const response = await fetch("http://localhost:3001/courses");
+        const response = await fetch(`${API_BASE}/courses`);
         const result = await response.json();
-        setMajorClasses(result);
 
-        const keys = Object.keys(result);
-        if (keys.length > 0 && !keys.includes(selectedMajor)) {
-          setSelectedMajor(keys[0]);
+        const majors = Object.keys(result ?? {});
+        setAvailableMajors(majors);
+
+        if (majors.length > 0 && !majors.includes(selectedMajor)) {
+          setSelectedMajor(majors[0]);
         }
       } catch (err) {
         console.error("Failed to fetch majors:", err);
       }
     };
 
-    //  NEW: log faculty backend routes
-    const logFacultyRoutes = async () => {
+    fetchMajors();
+  }, [selectedMajor]);
+
+  useEffect(() => {
+    const fetchCompetencies = async () => {
       try {
-        const facultyId = 34; // TODO: replace with real faculty id later
+        const response = await fetch(`${API_BASE}/api/faculty/skills-options`, {
+          credentials: "include",
+        });
 
-        // 1) editable courses response
-        const coursesRes = await fetch(
-          `http://localhost:3001/api/faculty/courses?facultyId=${facultyId}`,
-          {
-            method: "GET",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-
-        const coursesJson = await coursesRes.json();
-        console.log("FACULTY /api/faculty/courses status:", coursesRes.status);
-        console.log("FACULTY /api/faculty/courses JSON:", coursesJson);
-
-        // 2) skills + competencies options response
-        const optsRes = await fetch(
-          "http://localhost:3001/api/faculty/skills-options",
-          {
-            method: "GET",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-
-        const optsJson = await optsRes.json();
-        console.log(
-          "FACULTY /api/faculty/skills-options status:",
-          optsRes.status,
-        );
-        console.log("FACULTY /api/faculty/skills-options JSON:", optsJson);
-
-        // 3) OPTIONAL: log mapping for the first returned course
-        if (Array.isArray(coursesJson) && coursesJson.length > 0) {
-          const firstCourseId = coursesJson[0].id;
-
-          const mapRes = await fetch(
-            `http://localhost:3001/api/faculty/courses/${firstCourseId}/mapping?facultyId=${facultyId}`,
-            {
-              method: "GET",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-            },
-          );
-
-          const mapJson = await mapRes.json();
-          console.log(
-            "FACULTY /api/faculty/courses/:id/mapping status:",
-            mapRes.status,
-          );
-          console.log(
-            "FACULTY /api/faculty/courses/:id/mapping JSON:",
-            mapJson,
-          );
+        if (!response.ok) {
+          throw new Error(`Failed to load competencies (${response.status})`);
         }
+
+        const data = await response.json();
+        const competencies = Array.isArray(data?.competencies)
+          ? data.competencies
+          : [];
+
+        setCompetencyOptions(competencies);
       } catch (err) {
-        console.error("Faculty route logging failed:", err);
+        console.error("Failed to load competencies:", err);
       }
     };
 
-    fetchMajorClasses();
-    logFacultyRoutes();
+    fetchCompetencies();
+  }, []);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  const isSubmitDisabled =
+    formSubmitting ||
+    checkingDuplicate ||
+    !selectedMajor.trim() ||
+    !courseCode.trim() ||
+    !courseTitle.trim() ||
+    !!prefixError ||
+    (duplicateCodeFound && !alternateCourseTitle.trim());
 
-  /* ---------- Render ---------------------------------------------------- */
   return (
-    <div className="dashboard-page">
-      <Navbar />
-      {/* main content */}
-      <main className="dashboard-main">
-        {/* Title + subtitle */}
-        <section className="dashboard-title-block">
-          <h1 className="dashboard-title">Faculty Dashboard</h1>
-          <p className="dashboard-subtitle">
-            Manage course mappings and competencies.
-          </p>
-        </section>
+    <section className="card-section">
+      <div className="card-surface">
+        <h2>Add Course Mapping</h2>
 
-        {/* ─────────────────────── Courses ─────────────────────── */}
-        <section className="card-section">
-          <div className="card-surface">
-            <h2>Add Course Mapping</h2>
-            <form onSubmit={addCourse} style={styles.form}>
-              {/* Major Selection */}
-              <div style={{ width: "100%" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "0.5rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Select Major:
-                </label>
-                {majorClasses ? (
-                  <select
-                    className="textbox"
-                    value={selectedMajor}
-                    onChange={handleMajorChange}
-                    style={styles.input}
-                  >
-                    {Object.keys(majorClasses).map((major) => (
-                      <option key={major} value={major}>
-                        {major}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-muted">Loading majors...</p>
-                )}
-              </div>
-
-              {/* Course Selection (Radio Buttons) */}
-              <div style={{ width: "100%", margin: "1rem 0" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "0.5rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Select Course:
-                </label>
-                {majorClasses &&
-                majorClasses[selectedMajor] &&
-                majorClasses[selectedMajor].length > 0 ? (
-                  <div className="class-grid">
-                    {majorClasses[selectedMajor].map((c) => (
-                      <label key={c.id} className="class-option">
-                        <input
-                          type="radio"
-                          name="courseSelection"
-                          value={c.label}
-                          checked={courseName === c.label}
-                          onChange={(e) => setCourseName(e.target.value)}
-                        />
-                        <span>{c.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted" style={{ fontStyle: "italic" }}>
-                    No courses available for this major.
-                  </p>
-                )}
-              </div>
-
-              <AutofillSkillBox
-                value={courseSkills}
-                onChange={setCourseSkills}
-              />
-              <textarea
-                className="textbox"
-                placeholder="Competencies (e.g., Problem Solving, Teamwork)"
-                value={courseCompetencies}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                  setCourseCompetencies(e.target.value)
-                }
-                style={{ ...styles.input, height: 60 }}
-              />
-              <button
-                type="submit"
-                style={{ ...styles.button, opacity: courseName ? 1 : 0.6 }}
-                disabled={!courseName}
-              >
-                Add Course
-              </button>
-            </form>
-          </div>
-        </section>
-        <section className="card-section">
-          <div className="card-surface">
-            {courses.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#666" }}>
-                No courses added yet. Use the form above to map a course.
-              </p>
-            ) : (
-              courses.map((c) => (
-                <div key={c.id}>
-                  <CourseCard
-                    id={c.id}
-                    name={c.name}
-                    skills={[c.skills ?? ""]}
-                    competencies={[c.competencies ?? ""]}
-                    deleteMethod={() =>
-                      setCourses((prev) =>
-                        prev.filter((pc) => pc.name !== c.name),
-                      )
-                    }
-                  />
-                </div>
+        <form onSubmit={addCourse} className="faculty-form">
+          <select
+            className="textbox faculty-input"
+            value={selectedMajor}
+            onChange={(e) => {
+              const newMajor = e.target.value;
+              setSelectedMajor(newMajor);
+              validateCoursePrefix(courseCode, newMajor);
+            }}
+          >
+            {availableMajors.length > 0 ? (
+              availableMajors.map((major) => (
+                <option key={major} value={major}>
+                  {major}
+                </option>
               ))
+            ) : (
+              <option>Loading...</option>
             )}
+          </select>
+
+          <input
+            className="textbox faculty-input"
+            type="text"
+            placeholder="Course Code (e.g., SER 210)"
+            value={courseCode}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              const value = e.target.value.toUpperCase();
+              setCourseCode(value);
+              validateCoursePrefix(value, selectedMajor);
+            }}
+            onBlur={() => {
+              validateCoursePrefix(courseCode, selectedMajor);
+              void checkDuplicateCourseCode(courseCode);
+            }}
+          />
+          {prefixError && <div className="form-error">{prefixError}</div>}
+
+          <input
+            className="textbox faculty-input"
+            type="text"
+            placeholder="Course Title (e.g., Software Design and Architecture)"
+            value={courseTitle}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setCourseTitle(e.target.value)
+            }
+          />
+
+          {duplicateCodeFound && (
+            <div className="form-warning">
+              This course code already exists. Please enter an alternate course
+              title.
+            </div>
+          )}
+
+          {duplicateCodeFound && (
+            <input
+              className="textbox faculty-input"
+              type="text"
+              placeholder="Alternate Course Title"
+              value={alternateCourseTitle}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setAlternateCourseTitle(e.target.value)
+              }
+            />
+          )}
+
+          <AutofillSkillBox
+            value={courseSkills}
+            onChange={setCourseSkills}
+            placeholder="Add Skills (e.g., React, SQL, Agile)"
+          />
+
+          <div className="competency-checkbox-grid">
+            {competencyOptions.map((competency) => (
+              <label key={competency.Skill_Id} className="competency-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedCompetencyIds.includes(competency.Skill_Id)}
+                  onChange={() => toggleCompetency(competency.Skill_Id)}
+                />
+                <span>{competency.Skill_name}</span>
+              </label>
+            ))}
           </div>
-        </section>
-      </main>
-      {/* Footer */}
-      <Footer />
-    </div>
+
+          {formError && <div className="form-error">{formError}</div>}
+          {formSuccess && <div className="form-success">{formSuccess}</div>}
+
+          <button
+            type="submit"
+            className="faculty-submit-button centered-button"
+            disabled={isSubmitDisabled}
+          >
+            {formSubmitting ? "Adding..." : "Add Course"}
+          </button>
+        </form>
+      </div>
+    </section>
   );
-};
-
-/* ---------- Inline CSS ---------------------------------------------- */
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: 900,
-    margin: "0 auto",
-    padding: 20,
-    fontFamily: "Arial, sans-serif",
-  },
-  header: { textAlign: "center", color: "#333" },
-
-  section: {
-    marginBottom: 40,
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    padding: 20,
-    background: "#f9f9f9",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 10,
-    width: "100%",
-  },
-
-  input: {
-    padding: 8,
-    fontSize: 14,
-    borderRadius: 4,
-    border: "1px solid #ccc",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-  button: {
-    padding: "8px 16px",
-    background: "#0069d9",
-    color: "#fff",
-    border: "none",
-    borderRadius: 4,
-    cursor: "pointer",
-    marginTop: "10px",
-  },
 };
 
 export default FacultyDashboard;

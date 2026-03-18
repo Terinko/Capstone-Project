@@ -32,7 +32,6 @@ export default function AutofillSkillBox({
   value,
   onChange,
   placeholder = "Skills (e.g., React, SQL, Agile)",
-  label = "Skills",
   limit = 10,
 }: Props) {
   const [dataset, setDataset] = useState<AutofillDataset | null>(null);
@@ -78,6 +77,21 @@ export default function AutofillSkillBox({
       .slice(0, limit);
   }, [dataset, query, selectedSet, limit]);
 
+  const addTypedSkill = () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    const norm = normalize(trimmed);
+    if (selectedSet.has(norm)) {
+      setQuery("");
+      return;
+    }
+
+    const next = [...selected, trimmed];
+    onChange(toCommaList(next));
+    setQuery("");
+  };
+
   const addSkill = (name: string) => {
     const norm = normalize(name);
     if (selectedSet.has(norm)) return;
@@ -93,16 +107,6 @@ export default function AutofillSkillBox({
 
   return (
     <div style={{ width: "100%" }}>
-      <label
-        style={{
-          display: "block",
-          marginBottom: "0.5rem",
-          fontWeight: "bold",
-        }}
-      >
-        {label}
-      </label>
-
       {/* Selected chips */}
       {selected.length > 0 && (
         <div
@@ -114,19 +118,7 @@ export default function AutofillSkillBox({
           }}
         >
           {selected.map((s) => (
-            <span
-              key={s}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid #ddd",
-                background: "#fff",
-                fontSize: 14,
-              }}
-            >
+            <span key={s} className="skill-chip">
               {s}
               <button
                 type="button"
@@ -148,31 +140,23 @@ export default function AutofillSkillBox({
 
       {/* Input */}
       <input
-        className="textbox"
+        className="textbox faculty-input"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          boxSizing: "border-box",
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addTypedSkill();
+          }
         }}
+        placeholder={placeholder}
       />
 
       {error && <div style={{ marginTop: 8, color: "crimson" }}>{error}</div>}
 
       {/* Dropdown */}
       {!error && dataset && query.trim().length > 0 && results.length > 0 && (
-        <div
-          style={{
-            marginTop: 8,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            overflow: "hidden",
-            background: "#fff",
-            maxHeight: 220,
-            overflowY: "auto",
-          }}
-        >
+        <div className="skill-dropdown">
           {results.map((r) => (
             <button
               key={r.Skill_Id}
@@ -181,15 +165,7 @@ export default function AutofillSkillBox({
                 addSkill(r.Skill_name);
                 setQuery("");
               }}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                padding: "10px 12px",
-                border: "none",
-                borderBottom: "1px solid #eee",
-                background: "white",
-                cursor: "pointer",
-              }}
+              className="skill-dropdown-item"
             >
               {r.Skill_name}
             </button>
@@ -198,7 +174,9 @@ export default function AutofillSkillBox({
       )}
 
       {!error && dataset && query.trim().length > 0 && results.length === 0 && (
-        <div style={{ marginTop: 8, opacity: 0.7 }}>No matches.</div>
+        <div className="skill-no-matches">
+          No matches. Press Enter to add "{query.trim()}" as a new skill.
+        </div>
       )}
     </div>
   );
