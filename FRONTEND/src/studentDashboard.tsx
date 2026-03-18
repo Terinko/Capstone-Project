@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from "react";
-// Updated import to match the local file structure
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../supabaseClient";
-// Assumed relative imports for other components
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
@@ -24,10 +22,18 @@ type MajorOption =
   | "Mechanical Engineering"
   | "Industrial Engineering";
 
+type GenerationMode = "skills" | "talkingPoints";
+
+// One entry per unique Course_Code within a major.
+// offerings holds every DB row that shares that code (one per version).
+interface CourseOffering {
+  id: string;
+  altName: string | null;
+}
+
 interface ClassOption {
-  id: string; // This is now the DB Course_Id (as string)
-  label: string; // This is the Course_Code
-  courseId?: string; // This is the Course_Code (kept for compatibility)
+  courseCode: string;
+  offerings: CourseOffering[];
 }
 
 interface Skill {
@@ -38,7 +44,10 @@ interface Skill {
 
 const StudentDashboard: React.FC = () => {
   const [major, setMajor] = useState<MajorOption>("Software Engineering");
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [checkedCodes, setCheckedCodes] = useState<Set<string>>(new Set());
+  const [versionSelections, setVersionSelections] = useState<
+    Record<string, string>
+  >({});
   const [bullets, setBullets] = useState<string[]>([]);
   const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
 
@@ -47,6 +56,8 @@ const StudentDashboard: React.FC = () => {
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
   const [showRawSkills, setShowRawSkills] = useState<boolean>(false);
+  const [generationMode, setGenerationMode] =
+    useState<GenerationMode>("skills");
 
   const [majorClasses, setMajorClasses] = useState<Record<
     MajorOption,
@@ -71,8 +82,28 @@ const StudentDashboard: React.FC = () => {
     fetchMajorClasses();
   }, []);
 
-  const availableClasses =
-    majorClasses && majorClasses[major] ? majorClasses[major] : [];
+  const availableClasses = useMemo(() => {
+    const baseClasses =
+      majorClasses && majorClasses[major] ? majorClasses[major] : [];
+
+    return baseClasses.map((course) => {
+      const hasAlternate = course.offerings.some(
+        (o) => o.altName && o.altName.trim() !== "",
+      );
+
+      let filteredOfferings = hasAlternate
+        ? course.offerings.filter((o) => o.altName && o.altName.trim() !== "")
+        : course.offerings;
+
+      filteredOfferings = Array.from(
+        new Map(
+          filteredOfferings.map((o) => [o.altName?.trim() || "Standard", o]),
+        ).values(),
+      );
+
+      return { ...course, offerings: filteredOfferings };
+    });
+  }, [majorClasses, major]);
 
   // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
   useEffect(() => {
@@ -85,11 +116,11 @@ const StudentDashboard: React.FC = () => {
       setIsLoadingSkills(true);
 
       try {
-        const validNumericIds = availableClasses
-          .map((c) => Number(c.id))
+        const allOfferingIds = availableClasses
+          .flatMap((c) => c.offerings.map((o) => Number(o.id)))
           .filter((n) => !isNaN(n) && n > 0);
 
-        if (validNumericIds.length === 0) {
+        if (allOfferingIds.length === 0) {
           setCourseSkills({});
           setIsLoadingSkills(false);
           return;
@@ -98,7 +129,7 @@ const StudentDashboard: React.FC = () => {
         const { data: mappingsData, error: mappingsError } = await supabase
           .from("Courses_Skill_Mapping")
           .select("*")
-          .in("Course_Id", validNumericIds);
+          .in("Course_Id", allOfferingIds);
 
         if (mappingsError) throw mappingsError;
 
@@ -118,11 +149,6 @@ const StudentDashboard: React.FC = () => {
 
         if (skillsError) throw skillsError;
 
-        const idToCodeMap: Record<number, string> = {};
-        availableClasses.forEach((c) => {
-          idToCodeMap[Number(c.id)] = c.courseId!;
-        });
-
         const allSkills = (skillsData || []).map((s) => ({
           Skill_Id: getVal(s, "Skill_Id"),
           Skill_Name: getVal(s, "Skill_name"),
@@ -134,24 +160,20 @@ const StudentDashboard: React.FC = () => {
         mappingsData.forEach((mapping) => {
           const mCourseId = getVal(mapping, "Course_Id");
           const mSkillId = getVal(mapping, "Skill_Id");
+          const key = String(mCourseId);
 
-          const courseCodeStr = idToCodeMap[mCourseId];
+          const skillDetail = allSkills.find(
+            (s) => String(s.Skill_Id) === String(mSkillId),
+          );
 
-          if (courseCodeStr) {
-            const skillDetail = allSkills.find(
-              (s) => String(s.Skill_Id) === String(mSkillId),
-            );
-            if (skillDetail) {
-              if (!skillsLookup[courseCodeStr]) {
-                skillsLookup[courseCodeStr] = [];
-              }
-              if (
-                !skillsLookup[courseCodeStr].some(
-                  (s) => s.Skill_Id === skillDetail.Skill_Id,
-                )
-              ) {
-                skillsLookup[courseCodeStr].push(skillDetail);
-              }
+          if (skillDetail) {
+            if (!skillsLookup[key]) skillsLookup[key] = [];
+            if (
+              !skillsLookup[key].some(
+                (s) => s.Skill_Id === skillDetail.Skill_Id,
+              )
+            ) {
+              skillsLookup[key].push(skillDetail);
             }
           }
         });
@@ -170,13 +192,86 @@ const StudentDashboard: React.FC = () => {
     loadSkillsForClasses();
   }, [major, majorClasses]);
 
-  const handleClassToggle = (id: string) => {
-    setSelectedClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  const toggleCourse = (courseCode: string) => {
+    setCheckedCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseCode)) {
+        next.delete(courseCode);
+        setVersionSelections((o) => {
+          const n = { ...o };
+          delete n[courseCode];
+          return n;
+        });
+      } else {
+        next.add(courseCode);
+      }
+      return next;
+    });
+    setBullets([]);
   };
 
-  const generateWithGemma = async (skillsByClass: Record<string, string[]>) => {
+  const selectVersion = (courseCode: string, offeringId: string) => {
+    setVersionSelections((prev) => ({ ...prev, [courseCode]: offeringId }));
+    setBullets([]);
+  };
+
+  const getResolvedId = (course: ClassOption): string | null => {
+    if (!checkedCodes.has(course.courseCode)) return null;
+    if (course.offerings.length === 1) return course.offerings[0].id;
+    return versionSelections[course.courseCode] ?? null;
+  };
+
+  const needsSectionCount = availableClasses.filter(
+    (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
+  ).length;
+
+  const buildResumePrompt = (
+    classBlocks: string,
+  ) => `Act as a professional resume writer.
+I will provide skills and tasks learned, grouped by university course.
+Transform these into strong, action-oriented resume bullet points, grouped by course.
+
+${classBlocks}
+
+Requirements:
+1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
+2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
+3. Consolidate related skills within the same course where appropriate.
+4. Do not include any markdown formatting.
+5. Return plain text only, with course headers followed by bullet points on new lines.
+`;
+
+  const buildTalkingPointsPrompt = (
+    classBlocks: string,
+  ) => `Act as a technical interview coach.
+
+I will provide skills and tasks learned, grouped by university course.
+Transform them into interview-prep talking points that a student can say out loud in an interview.
+
+${classBlocks}
+
+Requirements:
+1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
+2. Under each course, create one separate talking point for each provided skill or task.
+3. Do not combine multiple skills into one paragraph or one long response.
+4. Each talking point must be on its own new line.
+5. Write each talking point in first-person language (e.g., "I used...", "I built...", "I implemented...", "I worked with...").
+6. Make each talking point sound natural and interview-ready, as if the student is explaining their experience to an employer.
+7. Mention tools, technologies, concepts, or outcomes when possible, but keep each point concise.
+8. Keep each talking point to 1-2 sentences maximum.
+9. Do not include markdown formatting.
+10. Return plain text only, with course headers followed by individual talking points on separate lines.
+
+Important:
+- Preserve the granularity of the input.
+- If a course has 5 listed skills, output 5 separate talking points for that course.
+- Do not summarize the whole course in a single paragraph.
+`;
+
+  const generateWithAI = async (
+    skillsByClass: Record<string, string[]>,
+    mode: GenerationMode,
+  ) => {
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -188,19 +283,10 @@ const StudentDashboard: React.FC = () => {
         )
         .join("\n\n");
 
-      const prompt = `Act as a professional resume writer.
-I will provide skills and tasks learned, grouped by university course.
-Transform these into strong, action-oriented resume bullet points, grouped by course.
-
-${classBlocks}
-
-Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a (e.g., "SER-491:").
-2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
-3. Consolidate related skills within the same course where appropriate.
-4. Do not include any markdown formatting (like **bold**).
-5. Return plain text only, with course headers followed by bullet points on new lines.
-`;
+      const prompt =
+        mode === "skills"
+          ? buildResumePrompt(classBlocks)
+          : buildTalkingPointsPrompt(classBlocks);
 
       const payload = {
         model: MODEL_ID,
@@ -231,7 +317,11 @@ Requirements:
       setBullets(formattedBullets);
     } catch (error: any) {
       console.error("OpenRouter Error:", error);
-      setErrorMsg("Failed to generate bullets with Gemma 3.");
+      setErrorMsg(
+        mode === "skills"
+          ? "Failed to generate resume bullet points."
+          : "Failed to generate talking points.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -240,34 +330,32 @@ Requirements:
   const handleGenerate = () => {
     if (!availableClasses || availableClasses.length === 0) {
       setBullets([
-        `Class-based bullet points for ${major} are coming soon.`,
+        `Class-based content for ${major} is coming soon.`,
         "For now, try selecting Software Engineering to see an example.",
       ]);
       return;
     }
 
-    if (selectedClasses.length === 0) {
-      setBullets(["Select at least one class to generate bullet points."]);
+    if (checkedCodes.size === 0) {
+      setBullets([
+        generationMode === "skills"
+          ? "Select at least one class to generate bullet points."
+          : "Select at least one class to generate talking points.",
+      ]);
       return;
     }
 
-    const selectedClassObjects = availableClasses.filter((c) =>
-      selectedClasses.includes(c.id),
-    );
-
-    // Build a map of { courseLabel -> skill descriptions[] } to preserve class context
     const skillsByClass: Record<string, string[]> = {};
 
-    selectedClassObjects.forEach((classObj) => {
-      const lookupId = classObj.courseId;
+    availableClasses.forEach((course) => {
+      const resolvedId = getResolvedId(course);
+      if (!resolvedId) return;
 
-      if (lookupId && courseSkills[lookupId]) {
-        const descriptions = courseSkills[lookupId]
+      const skills = courseSkills[resolvedId];
+      if (skills && skills.length > 0) {
+        skillsByClass[course.courseCode] = skills
           .map((skill) => skill.Skill_Name)
           .filter(Boolean);
-        if (descriptions.length > 0) {
-          skillsByClass[classObj.label] = descriptions;
-        }
       }
     });
 
@@ -277,21 +365,24 @@ Requirements:
     }
 
     if (showRawSkills) {
-      // Show raw skills grouped by course for the tech demo
       const flat = Object.entries(skillsByClass).flatMap(([course, skills]) => [
         `${course}:`,
         ...skills,
       ]);
       setBullets(flat);
     } else {
-      generateWithGemma(skillsByClass);
+      generateWithAI(skillsByClass, generationMode);
     }
   };
 
   const handleCopy = () => {
     if (bullets.length === 0) return;
     navigator.clipboard.writeText(bullets.join("\n"));
-    alert("Bullet points copied to clipboard!");
+    alert(
+      generationMode === "skills"
+        ? "Bullet points copied to clipboard!"
+        : "Talking points copied to clipboard!",
+    );
   };
 
   const handleDownload = () => {
@@ -301,7 +392,10 @@ Requirements:
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "generated-bullet-points.txt";
+    a.download =
+      generationMode === "skills"
+        ? "generated-bullet-points.txt"
+        : "generated-talking-points.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -330,7 +424,8 @@ Requirements:
                 onChange={(e) => {
                   const newMajor = e.target.value as MajorOption;
                   setMajor(newMajor);
-                  setSelectedClasses([]);
+                  setCheckedCodes(new Set());
+                  setVersionSelections({});
                   setBullets([]);
                   setErrorMsg(null);
                 }}
@@ -360,16 +455,70 @@ Requirements:
                 </p>
               ) : availableClasses && availableClasses.length > 0 ? (
                 <div className="class-grid">
-                  {availableClasses.map((c) => (
-                    <label key={c.id} className="class-option">
-                      <input
-                        type="checkbox"
-                        checked={selectedClasses.includes(c.id)}
-                        onChange={() => handleClassToggle(c.id)}
-                      />
-                      <span>{c.label}</span>
-                    </label>
-                  ))}
+                  {availableClasses.map((course) => {
+                    const isChecked = checkedCodes.has(course.courseCode);
+                    const hasMany = course.offerings.length > 1;
+                    const resolvedId = getResolvedId(course);
+                    const needsPick =
+                      isChecked && hasMany && resolvedId === null;
+
+                    return (
+                      <div
+                        key={course.courseCode}
+                        style={{ display: "contents" }}
+                      >
+                        <label
+                          className={`class-option${isChecked ? " checked" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleCourse(course.courseCode)}
+                          />
+                          <span>{course.courseCode}</span>
+                          {needsPick && (
+                            <span
+                              style={{
+                                color: "#f59e0b",
+                                fontWeight: 700,
+                                marginLeft: 2,
+                              }}
+                            >
+                              !
+                            </span>
+                          )}
+                        </label>
+
+                        {isChecked && hasMany && (
+                          <div className="offering-sub-row">
+                            <span className="offering-sub-label">
+                              Which version?
+                            </span>
+                            {course.offerings.map((offering) => {
+                              const isSelected =
+                                versionSelections[course.courseCode] ===
+                                offering.id;
+                              return (
+                                <button
+                                  key={offering.id}
+                                  type="button"
+                                  className={`offering-pill${isSelected ? " selected" : ""}`}
+                                  onClick={() =>
+                                    selectVersion(
+                                      course.courseCode,
+                                      offering.id,
+                                    )
+                                  }
+                                >
+                                  {offering.altName ?? "Standard"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p
@@ -379,6 +528,22 @@ Requirements:
                   No classes found for this major.
                 </p>
               )}
+
+              {needsSectionCount > 0 && (
+                <p
+                  style={{
+                    marginTop: "0.75rem",
+                    fontSize: "0.8rem",
+                    color: "#f59e0b",
+                    fontWeight: 600,
+                  }}
+                >
+                  ⚠ {needsSectionCount} selected course
+                  {needsSectionCount > 1 ? "s" : ""} still need
+                  {needsSectionCount === 1 ? "s" : ""} a version selected before
+                  generating.
+                </p>
+              )}
             </div>
 
             <div
@@ -386,36 +551,88 @@ Requirements:
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "flex-end",
+                justifyContent: "space-between",
                 gap: "1rem",
                 marginTop: "2rem",
+                flexWrap: "wrap",
               }}
             >
-              <label
+              <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.5rem",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  color: "#64748b",
+                  gap: "1rem",
+                  flexWrap: "wrap",
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={showRawSkills}
-                  onChange={(e) => setShowRawSkills(e.target.checked)}
-                />
-                Tech Demo: Show Raw Skills
-              </label>
+                {/* NEW TOGGLE GOES HERE */}
+                <div className="generation-toggle-wrap">
+                  <span
+                    className={`toggle-label ${
+                      generationMode === "skills" ? "active" : ""
+                    }`}
+                  >
+                    Skill Generation
+                  </span>
+
+                  <button
+                    type="button"
+                    className={`generation-toggle ${
+                      generationMode === "talkingPoints" ? "is-on" : ""
+                    }`}
+                    onClick={() => {
+                      setGenerationMode((prev) =>
+                        prev === "skills" ? "talkingPoints" : "skills",
+                      );
+                      setBullets([]);
+                      setErrorMsg(null);
+                    }}
+                  >
+                    <span className="generation-toggle-track">
+                      <span className="generation-toggle-thumb" />
+                    </span>
+                  </button>
+
+                  <span
+                    className={`toggle-label ${
+                      generationMode === "talkingPoints" ? "active" : ""
+                    }`}
+                  >
+                    Talking Points
+                  </span>
+                </div>
+
+                {/* KEEP THIS (your raw skills toggle stays) */}
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    color: "#64748b",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showRawSkills}
+                    onChange={(e) => setShowRawSkills(e.target.checked)}
+                  />
+                  Tech Demo: Show Raw Skills
+                </label>
+              </div>
 
               <button
                 type="button"
                 className={`btn-generate ${isLoading ? "btn-loading" : ""}`}
                 onClick={handleGenerate}
-                disabled={isLoading || isLoadingSkills}
+                disabled={isLoading || isLoadingSkills || needsSectionCount > 0}
               >
-                {isLoading ? "Generating..." : "Generate with AI"}
+                {isLoading
+                  ? "Generating..."
+                  : generationMode === "skills"
+                    ? "Generate Skills with AI"
+                    : "Generate Talking Points with AI"}
               </button>
             </div>
           </div>
@@ -427,7 +644,9 @@ Requirements:
               <h2 className="card-title">
                 {showRawSkills
                   ? "Raw Skills (Tech Demo):"
-                  : "Generated Bullet Points:"}
+                  : generationMode === "skills"
+                    ? "Generated Bullet Points:"
+                    : "Generated Talking Points:"}
               </h2>
 
               <div className="bullets-button">
@@ -436,7 +655,7 @@ Requirements:
                   className="btn-export"
                   onClick={handleDownload}
                   disabled={bullets.length === 0 || isLoading}
-                  aria-label="Download bullet points"
+                  aria-label="Download generated content"
                 >
                   Export
                 </button>
@@ -446,7 +665,7 @@ Requirements:
                   className="icon-button"
                   onClick={handleCopy}
                   disabled={bullets.length === 0 || isLoading}
-                  aria-label="Copy bullet points"
+                  aria-label="Copy generated content"
                 >
                   <i className="bi bi-clipboard"></i>
                 </button>
@@ -457,14 +676,18 @@ Requirements:
               {isLoading ? (
                 <div className="loading-container">
                   <div className="spinner"></div>
-                  <p>Generating bullet points with AI...</p>
+                  <p>
+                    {generationMode === "skills"
+                      ? "Generating bullet points with AI..."
+                      : "Generating talking points with AI..."}
+                  </p>
                 </div>
               ) : errorMsg ? (
                 <p className="error-text">{errorMsg}</p>
               ) : bullets.length === 0 ? (
                 <p className="placeholder-text">
-                  Select classes and click "Generate" to see your AI-enhanced
-                  resume bullets.
+                  Select classes and click "Generate" to see your AI-generated
+                  content.
                 </p>
               ) : (
                 <ul>

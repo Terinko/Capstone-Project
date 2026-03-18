@@ -5,7 +5,11 @@
   display: flex;
   flex-direction: column;
   background: #f5f5f5;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
     sans-serif;
   flex: 1;
 }
@@ -228,4 +232,135 @@
   .class-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Checked state for course chip */
+.class-option.checked {
+  color: #131d43;
+  font-weight: 600;
+}
+
+/* Professor sub-row — spans full grid width beneath a checked chip */
+.offering-sub-row {
+  grid-column: 1 / -1;
+  background: #f5f7ff;
+  border: 1.5px solid #131d43;
+  border-radius: 12px;
+  padding: 0.5rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  animation: subrow-in 0.15s ease;
+}
+
+@keyframes subrow-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.offering-sub-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #131d43;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Professor pill buttons — match existing pill style */
+.offering-pill {
+  padding: 0.25rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #131d43;
+  background: #ffffff;
+  color: #131d43;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.offering-pill:hover {
+  background: #ffb718;
+  color: #131d43;
+}
+
+.offering-pill.selected {
+  background: #131d43;
+  color: #ffb718;
+}
+
+.generation-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.toggle-label {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+  transition:
+    color 0.2s ease,
+    font-weight 0.2s ease;
+}
+
+.toggle-label.active {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.generation-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.generation-toggle-track {
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+.generation-toggle-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+}
+
+.generation-toggle.is-on .generation-toggle-track {
+  background: #2563eb;
+}
+
+.generation-toggle.is-on .generation-toggle-thumb {
+  transform: translateX(26px);
+}
+
+.generation-toggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+  border-radius: 999px;
 }

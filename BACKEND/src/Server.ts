@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
 import { RequireAdmin, RequireAuth } from "./Middleware/RequireAuth.js";
-import { getAllCourses } from "./Models/CoursesModel.js";
+import { getAllCourses, getCoursesByMajor } from "./Models/CoursesModel.js";
 import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
 import { authProfileRouter } from "./Routers/AuthProfileRouter.js";
@@ -28,7 +28,7 @@ app.use("/api/auth", forgotPasswordRouter); // ← NEW: forgot-password, verify-
 
 // Protected routes
 app.use("/api/auth", RequireAuth, authProfileRouter);
-app.use("/api/faculty", facultyCoursesRouter);
+app.use("/api/faculty", RequireAuth, facultyCoursesRouter);
 app.use("/api/admin", RequireAdmin, adminCoursesRouter);
 app.use("/api/autofill", autofillRouter);
 
@@ -38,21 +38,20 @@ app.get("/courses", async (req: Request, res: Response) => {
   try {
     const courses = await getAllCourses();
 
-    const grouped: Record<string, any[]> = {
-      "Software Engineering": [],
-      "Computer Science": [],
-      "Mechanical Engineering": [],
-      "Industrial Engineering": [],
-    };
+    // Derive the list of majors present in the DB dynamically
+    const majors = [...new Set(courses.map((c) => c.Major))].sort();
 
-    courses.forEach((c) => {
-      if (!grouped[c.Major]) grouped[c.Major] = [];
-      (grouped as any)[c.Major].push({
-        id: String(c.Course_Id),
-        label: c.Course_Code,
-        courseId: c.Course_Code,
-      });
-    });
+    const grouped: Record<
+      string,
+      {
+        courseCode: string;
+        offerings: { id: string; altName: string | null }[];
+      }[]
+    > = {};
+
+    for (const major of majors) {
+      grouped[major] = await getCoursesByMajor(major);
+    }
 
     res.json(grouped);
   } catch (error) {

@@ -1,8 +1,15 @@
 import { Router, type Request, type Response } from "express";
-import { getAllCourses, updateCourse } from "../Models/CoursesModel.js";
+import {
+  getAllCourses,
+  getCourseById,
+  updateCourse,
+  findPairedCoursesByCodeAndProfessor,
+  updateCrossMajorMatchingCoursesByCodeAndProfessor,
+} from "../Models/CoursesModel.js";
+
 import {
   getCourseMappings,
-  replaceCourseMappings,
+  replaceMappingsForCourseIds,
 } from "../Models/CourseSkillMappingModel.js";
 import {
   getAllSkillsAndCompetencies,
@@ -79,7 +86,8 @@ adminCoursesRouter.get(
 /**
  * PUT /api/admin/courses/:courseId/mapping
  * Body: { skillIds: number[], competencyIds: number[] }
- * Replaces mapping set.
+ * Replaces mapping set on the selected course and any paired opposite-major
+ * course with the same original course number + original professor.
  */
 type UpdateMappingBody = {
   skillIds?: number[];
@@ -98,6 +106,8 @@ adminCoursesRouter.put(
         return res.status(400).json({ error: "Invalid courseId" });
       }
 
+      const existingCourse = await getCourseById(courseId);
+
       const skillIds = Array.isArray(req.body.skillIds)
         ? req.body.skillIds
         : [];
@@ -111,10 +121,27 @@ adminCoursesRouter.put(
 
       const uniqueIds = Array.from(new Set(allIds));
 
-      await replaceCourseMappings(courseId, uniqueIds);
+      const pairedCourses = await findPairedCoursesByCodeAndProfessor(
+        courseId,
+        existingCourse.Course_Code,
+        existingCourse.Major,
+        existingCourse.Professor ?? "",
+      );
+
+      const allCourseIdsToReplace = [
+        courseId,
+        ...pairedCourses.map((c) => c.Course_Id),
+      ];
+
+      await replaceMappingsForCourseIds(allCourseIdsToReplace, uniqueIds);
 
       const updated = await getCourseMappings(courseId);
-      res.json(updated);
+
+      res.json({
+        updated,
+        syncedCourseIds: pairedCourses.map((c) => c.Course_Id),
+        syncedCount: pairedCourses.length,
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       res.status(500).json({ error: msg });
@@ -183,7 +210,8 @@ adminCoursesRouter.delete(
 /**
  * PUT /api/admin/courses/:courseId
  * Body: { professor?: string, courseCode?: string, courseName?: string, major?: string }
- * Allows editing Professor (and other course fields if needed).
+ * Updates the selected course and any paired opposite-major course with the same
+ * original course number + original professor.
  */
 type UpdateCourseBody = {
   professor?: string;
@@ -204,7 +232,8 @@ adminCoursesRouter.put(
         return res.status(400).json({ error: "Invalid courseId" });
       }
 
-      // Build updates without undefined fields (required for exactOptionalPropertyTypes)
+      const existingCourse = await getCourseById(courseId);
+
       const updates: UpdateCourseBody = {};
 
       if (typeof req.body.professor === "string") {
@@ -222,7 +251,20 @@ adminCoursesRouter.put(
 
       const updated = await updateCourse(courseId, updates);
 
-      res.json(updated);
+      const syncedCourses =
+        await updateCrossMajorMatchingCoursesByCodeAndProfessor(
+          courseId,
+          existingCourse.Course_Code,
+          existingCourse.Major,
+          existingCourse.Professor ?? "",
+          updates,
+        );
+
+      res.json({
+        updated,
+        syncedCount: syncedCourses.length,
+        syncedCourses,
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       res.status(500).json({ error: msg });

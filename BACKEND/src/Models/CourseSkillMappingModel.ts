@@ -4,7 +4,6 @@ import { supabase } from "../Database/supabaseClient.js";
 export async function getCourseMappings(courseId: number) {
   const { data, error } = await supabase
     .from("Courses_Skill_Mapping")
-    // Description removed — names only
     .select("Skills(Skill_name, Type)")
     .eq("Course_Id", courseId);
 
@@ -48,6 +47,42 @@ export async function replaceCourseMappings(
   if (ins.error) throw new Error(ins.error.message);
 }
 
+export async function replaceMappingsForCourseIds(
+  courseIds: number[],
+  skillIds: number[],
+) {
+  const uniqueCourseIds = Array.from(
+    new Set(courseIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)),
+  );
+
+  if (uniqueCourseIds.length === 0) return;
+
+  const del = await supabase
+    .from("Courses_Skill_Mapping")
+    .delete()
+    .in("Course_Id", uniqueCourseIds);
+
+  if (del.error) throw new Error(del.error.message);
+
+  if (skillIds.length === 0) return;
+
+  const uniqueSkillIds = Array.from(
+    new Set(skillIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)),
+  );
+
+  const rows = uniqueCourseIds.flatMap((courseId) =>
+    uniqueSkillIds.map((skillId) => ({
+      Course_Id: courseId,
+      Skill_Id: skillId,
+    })),
+  );
+
+  if (rows.length === 0) return;
+
+  const ins = await supabase.from("Courses_Skill_Mapping").insert(rows);
+  if (ins.error) throw new Error(ins.error.message);
+}
+
 // Used when deleting a Skill itself: remove all mappings everywhere
 export async function deleteMappingsBySkillId(skillId: number) {
   const del = await supabase
@@ -76,11 +111,10 @@ export async function isCourseFullyMapped(courseId: number) {
   let hasCompetency = false;
 
   for (const row of data as any[]) {
-    // Skills is coming back as an array
     const type = row.Skills?.[0]?.Type;
 
-    if (type === false) hasSkill = true; // Skill
-    if (type === true) hasCompetency = true; // Competency
+    if (type === false) hasSkill = true;
+    if (type === true) hasCompetency = true;
 
     if (hasSkill && hasCompetency) return true;
   }

@@ -1,110 +1,104 @@
 import { Router, type Request, type Response } from "express";
 import {
-  getAllCourses,
-  createCourse,
-  findCoursesByCode,
-} from "../Models/CoursesModel.js";
-import {
   getCourseMappings,
   replaceCourseMappings,
+  replaceMappingsForCourseIds,
 } from "../Models/CourseSkillMappingModel.js";
 import {
   getAllSkillsAndCompetencies,
   findSkillByName,
   createSkillWithName,
 } from "../Models/SkillsModel.js";
-
 import {
   getFacultyCourseIds,
+  getFacultyName,
+  getVisibleCoursesForFaculty,
+  getUnassignedCourses,
   assignCourseToFaculty,
 } from "../Models/FacultyCoursesModel.js";
-import { findFacultyByEmail } from "../Models/UserModel.js";
+import {
+  getCourseById,
+  updateCourse,
+  findCoursesByCode,
+  createCourse,
+  findPairedCoursesByCodeAndProfessor,
+  updateCrossMajorMatchingCoursesByCodeAndProfessor,
+} from "../Models/CoursesModel.js";
 
 export const facultyCoursesRouter = Router();
 
-function resolveFacultyId(req: Request): number {
-  const fromHeader = req.header("x-faculty-id");
-  const fromQuery = req.query.facultyId;
-
-  const raw =
-    typeof fromHeader === "string"
-      ? fromHeader
-      : typeof fromQuery === "string"
-        ? fromQuery
-        : "";
-
-  const facultyId = Number(raw);
-  return Number.isInteger(facultyId) && facultyId > 0 ? facultyId : NaN;
+/**
+ * All routes sit behind RequireAuth in Server.ts.
+ * The middleware attaches the decoded JWT payload to req.user
+ * which includes { userId, userType }.
+ */
+function getFacultyId(req: Request): number {
+  const user = (req as any).user;
+  const id = Number(user?.userId);
+  return Number.isInteger(id) && id > 0 ? id : NaN;
 }
 
-function hasNoProfessorAssigned(professor: string): boolean {
-  const normalized = professor.trim().toUpperCase();
-  return normalized === "" || normalized === "N/A" || normalized === "NULL";
-}
-
+/**
+ * GET /api/faculty/courses?status=
+ * Returns courses visible to this faculty member:
+ * - courses they own via Faculty_Courses
+ * - courses with no professor assigned
+ * - courses whose Professor field matches their full name
+ * Rows with a null Course_Name_Alt are hidden when sibling rows for the
+ * same Course_Code have a non-null Course_Name_Alt.
+ */
 facultyCoursesRouter.get("/courses", async (req: Request, res: Response) => {
   try {
-    const facultyId = resolveFacultyId(req);
+    const facultyId = getFacultyId(req);
     if (!Number.isFinite(facultyId)) {
-      return res.status(400).json({
-        error:
-          "Missing/invalid facultyId (use ?facultyId= or x-faculty-id header)",
-      });
+      return res
+        .status(400)
+        .json({ error: "Missing or invalid faculty session" });
     }
 
-    const major = (req.query.major as string | undefined)?.trim();
     const status = (req.query.status as string | undefined)?.trim();
 
-    const [courses, facultyCourseIds] = await Promise.all([
-      getAllCourses(),
-      getFacultyCourseIds(facultyId),
-    ]);
+    // Look up faculty name for professor-name matching
+    const facultyFullName = await getFacultyName(facultyId);
 
-    const facultySet = new Set<number>(facultyCourseIds);
+    const courses = await getVisibleCoursesForFaculty(
+      facultyId,
+      facultyFullName,
+    );
+
+    // Find which Course_Codes have at least one row with a non-null altName
+    const codesWithAlt = new Set<string>(
+      courses.filter((c) => c.Course_Name_Alt).map((c) => c.Course_Code),
+    );
+
+    // Filter out the null-altName row for any code that has alternates
+    const visibleCourses = courses.filter((c) => {
+      if (codesWithAlt.has(c.Course_Code) && !c.Course_Name_Alt) return false;
+      return true;
+    });
 
     const rows = await Promise.all(
-      courses.map(async (c) => {
+      visibleCourses.map(async (c) => {
         const { skills, competencies } = await getCourseMappings(c.Course_Id);
-
         const completion =
           skills.length > 0 && competencies.length > 0 ? "Mapped" : "Unmapped";
 
-        const professor = c.Professor ?? "";
-        const ownedByFaculty = facultySet.has(Number(c.Course_Id));
-        const unmappedByProfessor = hasNoProfessorAssigned(professor);
-        console.log("facultyId:", facultyId);
-        console.log("facultyCourseIds:", facultyCourseIds);
-        console.log(
-          "all course ids:",
-          courses.map((c) => c.Course_Id),
-        );
-        console.log("faculty course ids:", facultyCourseIds);
         return {
           id: c.Course_Id,
           course: c.Course_Code,
+          altName: c.Course_Name_Alt ?? null,
           major: c.Major,
-          professor,
+          professor: c.Professor ?? "",
           completion,
           skills,
           competencies,
-          ownedByFaculty,
-          unmappedByProfessor,
         };
       }),
     );
 
     const filtered = rows.filter((r) => {
-      if (major && r.major !== major) return false;
-
-      if (status === "YourCourses") {
-        return r.ownedByFaculty;
-      }
-
-      if (status === "Unmapped") {
-        return r.unmappedByProfessor;
-      }
-
-      return r.ownedByFaculty || r.unmappedByProfessor;
+      if (status && status !== "All" && r.completion !== status) return false;
+      return true;
     });
 
     res.json(filtered);
@@ -114,16 +108,19 @@ facultyCoursesRouter.get("/courses", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/faculty/courses/:courseId/mapping?facultyId=
+ * Only allowed if the course is editable (their course OR Unmapped).
+ */
 facultyCoursesRouter.get(
   "/courses/:courseId/mapping",
   async (req: Request, res: Response) => {
     try {
-      const facultyId = resolveFacultyId(req);
+      const facultyId = getFacultyId(req);
       if (!Number.isFinite(facultyId)) {
-        return res.status(400).json({
-          error:
-            "Missing/invalid facultyId (use ?facultyId= or x-faculty-id header)",
-        });
+        return res
+          .status(400)
+          .json({ error: "Missing or invalid faculty session" });
       }
 
       const courseId = Number(req.params.courseId);
@@ -131,26 +128,17 @@ facultyCoursesRouter.get(
         return res.status(400).json({ error: "Invalid courseId" });
       }
 
-      const [courses, facultyCourseIds] = await Promise.all([
-        getAllCourses(),
-        getFacultyCourseIds(facultyId),
-      ]);
+      const facultyFullName = await getFacultyName(facultyId);
+      const visibleCourses = await getVisibleCoursesForFaculty(
+        facultyId,
+        facultyFullName,
+      );
+      const visibleIds = new Set(visibleCourses.map((c) => c.Course_Id));
 
-      const facultySet = new Set<number>(facultyCourseIds);
-      const course = courses.find((c) => Number(c.Course_Id) === courseId);
-
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      const editable =
-        facultySet.has(courseId) ||
-        hasNoProfessorAssigned(course.Professor ?? "");
-
-      if (!editable) {
+      if (!visibleIds.has(courseId)) {
         return res
           .status(403)
-          .json({ error: "Not allowed to view/edit this course mapping" });
+          .json({ error: "Not allowed to view this course mapping" });
       }
 
       const mapping = await getCourseMappings(courseId);
@@ -162,6 +150,14 @@ facultyCoursesRouter.get(
   },
 );
 
+/**
+ * PUT /api/faculty/courses/:courseId/mapping
+ * Body: { skillIds: number[], competencyIds: number[] }
+ *
+ * Allowed if the course is visible/editable to this faculty member.
+ * Replaces mappings on the selected course and any paired opposite-major
+ * course with the same original course number + original professor.
+ */
 type UpdateMappingBody = {
   skillIds?: number[];
   competencyIds?: number[];
@@ -174,11 +170,10 @@ facultyCoursesRouter.put(
     res: Response,
   ) => {
     try {
-      const facultyId = resolveFacultyId(req);
+      const facultyId = getFacultyId(req);
       if (!Number.isFinite(facultyId)) {
         return res.status(400).json({
-          error:
-            "Missing/invalid facultyId (use ?facultyId= or x-faculty-id header)",
+          error: "Missing or invalid faculty session",
         });
       }
 
@@ -187,27 +182,20 @@ facultyCoursesRouter.put(
         return res.status(400).json({ error: "Invalid courseId" });
       }
 
-      const [courses, facultyCourseIds] = await Promise.all([
-        getAllCourses(),
-        getFacultyCourseIds(facultyId),
-      ]);
+      const facultyFullName = await getFacultyName(facultyId);
+      const visibleCourses = await getVisibleCoursesForFaculty(
+        facultyId,
+        facultyFullName,
+      );
+      const visibleIds = new Set(visibleCourses.map((c) => c.Course_Id));
 
-      const facultySet = new Set<number>(facultyCourseIds);
-      const course = courses.find((c) => Number(c.Course_Id) === courseId);
-
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      const editable =
-        facultySet.has(courseId) ||
-        hasNoProfessorAssigned(course.Professor ?? "");
-
-      if (!editable) {
+      if (!visibleIds.has(courseId)) {
         return res
           .status(403)
           .json({ error: "Not allowed to edit this course mapping" });
       }
+
+      const existingCourse = await getCourseById(courseId);
 
       const skillIds = Array.isArray(req.body.skillIds)
         ? req.body.skillIds
@@ -222,9 +210,75 @@ facultyCoursesRouter.put(
 
       const uniqueIds = Array.from(new Set(allIds));
 
-      await replaceCourseMappings(courseId, uniqueIds);
+      const pairedCourses = await findPairedCoursesByCodeAndProfessor(
+        courseId,
+        existingCourse.Course_Code,
+        existingCourse.Major,
+        existingCourse.Professor ?? "",
+      );
+
+      const syncedVisibleCourseIds = pairedCourses
+        .map((c) => c.Course_Id)
+        .filter((id) => visibleIds.has(id));
+
+      const allCourseIdsToReplace = [courseId, ...syncedVisibleCourseIds];
+
+      await replaceMappingsForCourseIds(allCourseIdsToReplace, uniqueIds);
 
       const updated = await getCourseMappings(courseId);
+
+      res.json({
+        updated,
+        syncedCourseIds: syncedVisibleCourseIds,
+        syncedCount: syncedVisibleCourseIds.length,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      res.status(500).json({ error: msg });
+    }
+  },
+);
+
+/**
+ * PUT /api/faculty/courses/:courseId/claim
+ * Allows a faculty member to claim an unassigned course.
+ */
+facultyCoursesRouter.put(
+  "/courses/:courseId/claim",
+  async (req: Request, res: Response) => {
+    try {
+      const facultyId = getFacultyId(req);
+      if (!Number.isFinite(facultyId)) {
+        return res
+          .status(400)
+          .json({ error: "Missing or invalid faculty session" });
+      }
+
+      const courseId = Number(req.params.courseId);
+      if (!Number.isInteger(courseId) || courseId <= 0) {
+        return res.status(400).json({ error: "Invalid courseId" });
+      }
+
+      // Ensure the course is currently unassigned to prevent stealing courses
+      const unassignedCourses = await getUnassignedCourses();
+      const isUnassigned = unassignedCourses.some(
+        (c) => c.Course_Id === courseId,
+      );
+
+      if (!isUnassigned) {
+        return res
+          .status(403)
+          .json({ error: "Course is already assigned or unavailable" });
+      }
+
+      // Fetch the faculty's full name
+      const facultyFullName = await getFacultyName(facultyId);
+
+      // Update the course using the existing updateCourse model function
+      const updated = await updateCourse(courseId, {
+        professor: facultyFullName,
+      });
+
       res.json(updated);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
@@ -233,6 +287,57 @@ facultyCoursesRouter.put(
   },
 );
 
+/**
+ * GET /api/faculty/unassigned-courses?status=
+ * Returns courses with no professor (null, empty, or "N/A").
+ * Applies the same completion status filter as the main courses endpoint.
+ */
+facultyCoursesRouter.get(
+  "/unassigned-courses",
+  async (req: Request, res: Response) => {
+    try {
+      const status = (req.query.status as string | undefined)?.trim();
+
+      const courses = await getUnassignedCourses();
+
+      const rows = await Promise.all(
+        courses.map(async (c) => {
+          const { skills, competencies } = await getCourseMappings(c.Course_Id);
+          const completion =
+            skills.length > 0 && competencies.length > 0
+              ? "Mapped"
+              : "Unmapped";
+
+          return {
+            id: c.Course_Id,
+            course: c.Course_Code,
+            altName: c.Course_Name_Alt ?? null,
+            major: c.Major,
+            professor: c.Professor ?? "",
+            completion,
+            skills,
+            competencies,
+          };
+        }),
+      );
+
+      const filtered = rows.filter((r) => {
+        if (status && status !== "All" && r.completion !== status) return false;
+        return true;
+      });
+
+      res.json(filtered);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      res.status(500).json({ error: msg });
+    }
+  },
+);
+
+/**
+ * GET /api/faculty/skills-options
+ * Faculty can read options for dropdowns.
+ */
 facultyCoursesRouter.get(
   "/skills-options",
   async (_req: Request, res: Response) => {
@@ -246,37 +351,17 @@ facultyCoursesRouter.get(
   },
 );
 
-facultyCoursesRouter.get("/me", async (req: Request, res: Response) => {
-  try {
-    const email = (req.query.email as string | undefined)?.trim();
-
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    const faculty = await findFacultyByEmail(email);
-
-    if (!faculty) {
-      return res.status(404).json({ error: "Faculty user not found" });
-    }
-
-    return res.json({
-      facultyId: faculty.Faculty_Id,
-      email: faculty.Faculty_Qu_Email,
-      firstName: faculty.FirstName,
-      lastName: faculty.LastName,
-      type: faculty.Type,
-    });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return res.status(500).json({ error: msg });
-  }
-});
-
 facultyCoursesRouter.get(
   "/courses/check-code",
   async (req: Request, res: Response) => {
     try {
+      const facultyId = getFacultyId(req);
+      if (!Number.isFinite(facultyId)) {
+        return res
+          .status(400)
+          .json({ error: "Missing or invalid faculty session" });
+      }
+
       const courseCode = (req.query.courseCode as string | undefined)?.trim();
 
       if (!courseCode) {
@@ -285,7 +370,7 @@ facultyCoursesRouter.get(
 
       const matches = await findCoursesByCode(courseCode);
 
-      return res.json({
+      res.json({
         exists: matches.length > 0,
         matches: matches.map((m) => ({
           courseId: m.Course_Id,
@@ -297,7 +382,7 @@ facultyCoursesRouter.get(
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      return res.status(500).json({ error: msg });
+      res.status(500).json({ error: msg });
     }
   },
 );
@@ -305,6 +390,7 @@ facultyCoursesRouter.get(
 type CreateCourseBody = {
   courseCode?: string;
   courseName?: string;
+  alternateCourseTitle?: string;
   major?: string;
   skillNames?: string[];
   competencyIds?: number[];
@@ -317,16 +403,16 @@ facultyCoursesRouter.post(
     res: Response,
   ) => {
     try {
-      const facultyId = resolveFacultyId(req);
+      const facultyId = getFacultyId(req);
       if (!Number.isFinite(facultyId)) {
-        return res.status(400).json({
-          error:
-            "Missing/invalid facultyId (use ?facultyId= or x-faculty-id header)",
-        });
+        return res
+          .status(400)
+          .json({ error: "Missing or invalid faculty session" });
       }
 
       const courseCode = req.body.courseCode?.trim() ?? "";
       const courseName = req.body.courseName?.trim() ?? "";
+      const alternateCourseTitle = req.body.alternateCourseTitle?.trim() ?? "";
       const major = req.body.major?.trim() ?? "";
 
       if (!courseCode || !courseName || !major) {
@@ -347,12 +433,11 @@ facultyCoursesRouter.post(
 
       for (const rawName of rawSkillNames) {
         const normalizedSkillName = String(rawName ?? "").trim();
-
         if (!normalizedSkillName) continue;
 
         const existingSkill = await findSkillByName(normalizedSkillName);
 
-        if (existingSkill && existingSkill.Skill_Id) {
+        if (existingSkill?.Skill_Id) {
           resolvedSkillIds.push(Number(existingSkill.Skill_Id));
         } else {
           const createdSkill = await createSkillWithName(normalizedSkillName);
@@ -368,11 +453,16 @@ facultyCoursesRouter.post(
         new Set([...resolvedSkillIds, ...competencyIds]),
       );
 
+      const facultyFullName = await getFacultyName(facultyId);
+
       const newCourse = await createCourse({
         courseCode,
         courseName,
         major,
-        professor: "",
+        professor: facultyFullName,
+        ...(alternateCourseTitle
+          ? { courseNameAlt: alternateCourseTitle }
+          : {}),
       });
 
       await assignCourseToFaculty(facultyId, Number(newCourse.Course_Id));
@@ -383,13 +473,13 @@ facultyCoursesRouter.post(
 
       const mapping = await getCourseMappings(Number(newCourse.Course_Id));
 
-      return res.status(201).json({
+      res.status(201).json({
         course: newCourse,
         mapping,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      return res.status(500).json({ error: msg });
+      res.status(500).json({ error: msg });
     }
   },
 );

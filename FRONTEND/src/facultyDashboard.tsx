@@ -1,13 +1,34 @@
+// src/facultyDashboard.tsx
 import React, {
-  useState,
   useEffect,
+  useMemo,
+  useState,
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import Footer from "./footer";
+import Navbar from "./Navbar";
 import "./FacultyDashboard.css";
+import EditCourseMappingModal from "./EditCourseMappingModal";
 import AutofillSkillBox from "./AutofillTextBox";
+import { loadSession, clearSession } from "./Session";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type CompletionStatus = "Mapped" | "Unmapped";
+type CompletionFilter = "All" | "Mapped" | "Unmapped";
 type MajorOption = string;
+
+interface FacultyCourseRow {
+  id: number;
+  course: string;
+  altName: string | null;
+  major: string;
+  professor: string;
+  completion: CompletionStatus;
+  skills: string[];
+  competencies: string[];
+}
 
 interface SkillOption {
   Skill_Id: number;
@@ -15,11 +36,64 @@ interface SkillOption {
   Type: boolean;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+// ─── API helper (mirrors AdminDashboard exactly) ──────────────────────────────
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE) {
+  throw new Error("VITE_API_BASE_URL is not defined");
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = loadSession();
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(session && { Authorization: `Bearer ${session.token}` }),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (res.status === 401) {
+    clearSession();
+    window.location.href = "/";
+    throw new Error("Session expired, please log in again");
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const FacultyDashboard: React.FC = () => {
-  const facultyId = 34;
+  // ── Filters ───────────────────────────────────────────────────────────────
+  const [completionFilter, setCompletionFilter] =
+    useState<CompletionFilter>("All");
+  const [majorFilter, setMajorFilter] = useState<string>("");
 
+  // ── Table state ───────────────────────────────────────────────────────────
+  const [rows, setRows] = useState<FacultyCourseRow[]>([]);
+  const [unassignedRows, setUnassignedRows] = useState<FacultyCourseRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ── Unassigned table toggle ───────────────────────────────────────────────
+  const [unassignedOpen, setUnassignedOpen] = useState(false);
+
+  // ── Modal state ───────────────────────────────────────────────────────────
+  const [editing, setEditing] = useState<{ id: number; code: string } | null>(
+    null,
+  );
+
+  // ── Add Course Form state ────────────────────────────────────────────────
   const MAJOR_PREFIX_MAP: Record<string, string> = {
     "Software Engineering": "SER",
     "Computer Science": "CSC",
@@ -31,21 +105,21 @@ const FacultyDashboard: React.FC = () => {
   const [selectedMajor, setSelectedMajor] = useState<MajorOption>(
     "Software Engineering",
   );
-  const [availableMajors, setAvailableMajors] = useState<string[]>([]);
+  const [formMajors, setFormMajors] = useState<string[]>([]);
   const [prefixError, setPrefixError] = useState<string | null>(null);
 
-  const [courseCode, setCourseCode] = useState("");
-  const [courseTitle, setCourseTitle] = useState("");
   const [alternateCourseTitle, setAlternateCourseTitle] = useState("");
-  const [courseSkills, setCourseSkills] = useState("");
-
   const [duplicateCodeFound, setDuplicateCodeFound] = useState(false);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
-  const [competencyOptions, setCompetencyOptions] = useState<SkillOption[]>([]);
+  const [courseCode, setCourseCode] = useState("");
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseSkills, setCourseSkills] = useState("");
+
   const [selectedCompetencyIds, setSelectedCompetencyIds] = useState<number[]>(
     [],
   );
+  const [competencyOptions, setCompetencyOptions] = useState<SkillOption[]>([]);
 
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,6 +130,13 @@ const FacultyDashboard: React.FC = () => {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+
+  const formatCourseCode = (value: string) => {
+    const cleaned = value.trim().toUpperCase();
+    const match = cleaned.match(/^([A-Z]+)[\s-]*(\d+)$/);
+    if (!match) return cleaned;
+    return `${match[1]}-${match[2]}`;
+  };
 
   const toggleCompetency = (id: number) => {
     setSelectedCompetencyIds((prev) =>
@@ -77,7 +158,8 @@ const FacultyDashboard: React.FC = () => {
       return;
     }
 
-    const enteredPrefix = trimmed.split(" ")[0];
+    const match = trimmed.match(/^[A-Z]+/);
+    const enteredPrefix = match ? match[0] : "";
 
     if (enteredPrefix !== expectedPrefix) {
       setPrefixError(
@@ -89,9 +171,9 @@ const FacultyDashboard: React.FC = () => {
   };
 
   const checkDuplicateCourseCode = async (code: string) => {
-    const trimmed = code.trim();
+    const formattedCode = formatCourseCode(code);
 
-    if (!trimmed) {
+    if (!formattedCode) {
       setDuplicateCodeFound(false);
       setAlternateCourseTitle("");
       return;
@@ -101,26 +183,13 @@ const FacultyDashboard: React.FC = () => {
       setCheckingDuplicate(true);
 
       const params = new URLSearchParams();
-      params.set("courseCode", trimmed);
+      params.set("courseCode", formattedCode);
 
-      const response = await fetch(
-        `${API_BASE}/api/faculty/courses/check-code?${params.toString()}`,
-        {
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "x-faculty-id": String(facultyId),
-          },
-        },
+      const data = await apiFetch<{ exists?: boolean }>(
+        `/api/faculty/courses/check-code?${params.toString()}`,
       );
 
-      if (!response.ok) {
-        throw new Error(`Failed to check course code (${response.status})`);
-      }
-
-      const data = await response.json();
       const isDuplicate = Boolean(data?.exists);
-
       setDuplicateCodeFound(isDuplicate);
 
       if (!isDuplicate) {
@@ -148,15 +217,10 @@ const FacultyDashboard: React.FC = () => {
     try {
       setFormSubmitting(true);
 
-      const response = await fetch(`${API_BASE}/api/faculty/courses`, {
+      await apiFetch(`/api/faculty/courses`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-faculty-id": String(facultyId),
-        },
         body: JSON.stringify({
-          courseCode: courseCode.trim(),
+          courseCode: formatCourseCode(courseCode),
           courseName: courseTitle.trim(),
           alternateCourseTitle: duplicateCodeFound
             ? alternateCourseTitle.trim()
@@ -167,18 +231,15 @@ const FacultyDashboard: React.FC = () => {
         }),
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Failed to add course (${response.status})`);
-      }
-
       setCourseCode("");
       setCourseTitle("");
       setAlternateCourseTitle("");
       setCourseSkills("");
       setSelectedCompetencyIds([]);
       setDuplicateCodeFound(false);
+      setPrefixError(null);
       setFormSuccess("Course added successfully.");
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Add course failed:", err);
       setFormError(err instanceof Error ? err.message : "Failed to add course");
@@ -186,51 +247,6 @@ const FacultyDashboard: React.FC = () => {
       setFormSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    const fetchMajors = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/courses`);
-        const result = await response.json();
-
-        const majors = Object.keys(result ?? {});
-        setAvailableMajors(majors);
-
-        if (majors.length > 0 && !majors.includes(selectedMajor)) {
-          setSelectedMajor(majors[0]);
-        }
-      } catch (err) {
-        console.error("Failed to fetch majors:", err);
-      }
-    };
-
-    fetchMajors();
-  }, [selectedMajor]);
-
-  useEffect(() => {
-    const fetchCompetencies = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/faculty/skills-options`, {
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load competencies (${response.status})`);
-        }
-
-        const data = await response.json();
-        const competencies = Array.isArray(data?.competencies)
-          ? data.competencies
-          : [];
-
-        setCompetencyOptions(competencies);
-      } catch (err) {
-        console.error("Failed to load competencies:", err);
-      }
-    };
-
-    fetchCompetencies();
-  }, []);
 
   const isSubmitDisabled =
     formSubmitting ||
@@ -241,110 +257,614 @@ const FacultyDashboard: React.FC = () => {
     !!prefixError ||
     (duplicateCodeFound && !alternateCourseTitle.trim());
 
+  // ── Fetch faculty's courses and unassigned courses in parallel ────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = new URLSearchParams();
+        params.set("status", completionFilter);
+
+        const [data, unassigned] = await Promise.all([
+          apiFetch<FacultyCourseRow[]>(
+            `/api/faculty/courses?${params.toString()}`,
+          ),
+          apiFetch<FacultyCourseRow[]>(
+            `/api/faculty/unassigned-courses?${params.toString()}`,
+          ),
+        ]);
+
+        if (!cancelled) {
+          setRows(data);
+          setUnassignedRows(unassigned);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load courses");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [completionFilter, refreshKey]);
+
+  // ── Fetch majors for add form ─────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await apiFetch<Record<string, unknown>>(`/courses`);
+        const majors = Object.keys(result ?? {});
+
+        if (!cancelled) {
+          setFormMajors(majors);
+
+          if (majors.length > 0 && !majors.includes(selectedMajor)) {
+            setSelectedMajor(majors[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch majors:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMajor]);
+
+  // ── Fetch competencies for add form ───────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await apiFetch<{ competencies?: SkillOption[] }>(
+          `/api/faculty/skills-options`,
+        );
+
+        const competencies = Array.isArray(data?.competencies)
+          ? data.competencies
+          : [];
+
+        if (!cancelled) {
+          setCompetencyOptions(competencies);
+        }
+      } catch (err) {
+        console.error("Failed to load competencies:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Close modal when filter changes
+  useEffect(() => {
+    setEditing(null);
+  }, [completionFilter, majorFilter]);
+
+  // Derive available majors from both row sets combined
+  const availableMajors = useMemo(
+    () => [...new Set([...rows, ...unassignedRows].map((r) => r.major))].sort(),
+    [rows, unassignedRows],
+  );
+
+  // Apply major filter client-side to both tables
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (majorFilter && r.major !== majorFilter) return false;
+      return true;
+    });
+  }, [rows, majorFilter]);
+
+  const filteredUnassignedRows = useMemo(() => {
+    return unassignedRows.filter((r) => {
+      if (majorFilter && r.major !== majorFilter) return false;
+      return true;
+    });
+  }, [unassignedRows, majorFilter]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <section className="card-section">
-      <div className="card-surface">
-        <h2>Add Course Mapping</h2>
+    <div className="admin-dashboard">
+      <Navbar />
 
-        <form onSubmit={addCourse} className="faculty-form">
-          <select
-            className="textbox faculty-input"
-            value={selectedMajor}
-            onChange={(e) => {
-              const newMajor = e.target.value;
-              setSelectedMajor(newMajor);
-              validateCoursePrefix(courseCode, newMajor);
-            }}
-          >
-            {availableMajors.length > 0 ? (
-              availableMajors.map((major) => (
-                <option key={major} value={major}>
-                  {major}
-                </option>
-              ))
-            ) : (
-              <option>Loading...</option>
-            )}
-          </select>
+      <div className="admin-content">
+        <section className="admin-header">
+          <h1 className="admin-title">Faculty Dashboard</h1>
+          <p className="admin-subtitle">Manage your course mappings.</p>
+        </section>
 
-          <input
-            className="textbox faculty-input"
-            type="text"
-            placeholder="Course Code (e.g., SER 210)"
-            value={courseCode}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => {
-              const value = e.target.value.toUpperCase();
-              setCourseCode(value);
-              validateCoursePrefix(value, selectedMajor);
-            }}
-            onBlur={() => {
-              validateCoursePrefix(courseCode, selectedMajor);
-              void checkDuplicateCourseCode(courseCode);
-            }}
-          />
-          {prefixError && <div className="form-error">{prefixError}</div>}
+        {/* Add Course Mapping Form */}
+        <section className="card-section">
+          <div className="card-surface">
+            <h2>Add Course Mapping</h2>
 
-          <input
-            className="textbox faculty-input"
-            type="text"
-            placeholder="Course Title (e.g., Software Design and Architecture)"
-            value={courseTitle}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setCourseTitle(e.target.value)
-            }
-          />
+            <form onSubmit={addCourse} className="faculty-form">
+              <select
+                className="textbox faculty-input"
+                value={selectedMajor}
+                onChange={(e) => {
+                  const newMajor = e.target.value;
+                  setSelectedMajor(newMajor);
+                  validateCoursePrefix(courseCode, newMajor);
+                }}
+              >
+                {formMajors.length > 0 ? (
+                  formMajors.map((major) => (
+                    <option key={major} value={major}>
+                      {major}
+                    </option>
+                  ))
+                ) : (
+                  <option>Loading...</option>
+                )}
+              </select>
 
-          {duplicateCodeFound && (
-            <div className="form-warning">
-              This course code already exists. Please enter an alternate course
-              title.
-            </div>
-          )}
+              {duplicateCodeFound && (
+                <div className="form-warning">
+                  This course code already exists. Please enter an alternate
+                  course title.
+                </div>
+              )}
 
-          {duplicateCodeFound && (
-            <input
-              className="textbox faculty-input"
-              type="text"
-              placeholder="Alternate Course Title"
-              value={alternateCourseTitle}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setAlternateCourseTitle(e.target.value)
-              }
-            />
-          )}
+              <input
+                className="textbox faculty-input"
+                type="text"
+                placeholder="Course Code (e.g., SER-210)"
+                value={courseCode}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const value = e.target.value.toUpperCase();
+                  setCourseCode(value);
+                  validateCoursePrefix(value, selectedMajor);
+                }}
+                onBlur={() => {
+                  const formatted = formatCourseCode(courseCode);
+                  setCourseCode(formatted);
+                  validateCoursePrefix(formatted, selectedMajor);
+                  void checkDuplicateCourseCode(formatted);
+                }}
+              />
+              {prefixError && <div className="form-error">{prefixError}</div>}
 
-          <AutofillSkillBox
-            value={courseSkills}
-            onChange={setCourseSkills}
-            placeholder="Add Skills (e.g., React, SQL, Agile)"
-          />
+              <input
+                className="textbox faculty-input"
+                type="text"
+                placeholder="Course Title (e.g., Software Design and Architecture)"
+                value={courseTitle}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setCourseTitle(e.target.value)
+                }
+              />
 
-          <div className="competency-checkbox-grid">
-            {competencyOptions.map((competency) => (
-              <label key={competency.Skill_Id} className="competency-checkbox">
+              {duplicateCodeFound && (
                 <input
-                  type="checkbox"
-                  checked={selectedCompetencyIds.includes(competency.Skill_Id)}
-                  onChange={() => toggleCompetency(competency.Skill_Id)}
+                  className="textbox faculty-input"
+                  type="text"
+                  placeholder="Alternate Course Title"
+                  value={alternateCourseTitle}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setAlternateCourseTitle(e.target.value)
+                  }
                 />
-                <span>{competency.Skill_name}</span>
-              </label>
-            ))}
+              )}
+
+              <div style={{ marginTop: "12px", fontWeight: 600 }}>
+                (Optional) Skills & Competencies
+              </div>
+
+              <AutofillSkillBox
+                value={courseSkills}
+                onChange={setCourseSkills}
+                placeholder="Add Skills (e.g., React, SQL, Agile)"
+              />
+
+              <div className="competency-checkbox-grid">
+                {competencyOptions.map((competency) => (
+                  <label
+                    key={competency.Skill_Id}
+                    className="competency-checkbox"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCompetencyIds.includes(
+                        competency.Skill_Id,
+                      )}
+                      onChange={() => toggleCompetency(competency.Skill_Id)}
+                    />
+                    <span>{competency.Skill_name}</span>
+                  </label>
+                ))}
+              </div>
+
+              {formError && <div className="form-error">{formError}</div>}
+              {formSuccess && <div className="form-success">{formSuccess}</div>}
+
+              <button
+                type="submit"
+                className="faculty-submit-button centered-button"
+                disabled={isSubmitDisabled}
+              >
+                {formSubmitting ? "Adding..." : "Add Course"}
+              </button>
+            </form>
           </div>
+        </section>
 
-          {formError && <div className="form-error">{formError}</div>}
-          {formSuccess && <div className="form-success">{formSuccess}</div>}
+        {/* Filter bar */}
+        <section className="admin-filter-bar">
+          <div className="filter-left">
+            <span className="filter-icon" aria-hidden="true">
+              <i className="bi bi-funnel"></i>
+            </span>
 
-          <button
-            type="submit"
-            className="faculty-submit-button centered-button"
-            disabled={isSubmitDisabled}
-          >
-            {formSubmitting ? "Adding..." : "Add Course"}
-          </button>
-        </form>
+            <div className="filter-inline">
+              <label className="filter-label" htmlFor="completion-select">
+                Completion:
+              </label>
+              <select
+                id="completion-select"
+                className="filter-select"
+                value={completionFilter}
+                onChange={(e) =>
+                  setCompletionFilter(e.target.value as CompletionFilter)
+                }
+              >
+                <option value="All">All</option>
+                <option value="Mapped">Mapped</option>
+                <option value="Unmapped">Unmapped</option>
+              </select>
+            </div>
+
+            <div className="filter-inline">
+              <label className="filter-label" htmlFor="major-select">
+                Major:
+              </label>
+              <select
+                id="major-select"
+                className="filter-select"
+                value={majorFilter}
+                onChange={(e) => setMajorFilter(e.target.value)}
+              >
+                <option value="">All</option>
+                {availableMajors.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        {/* Loading */}
+        {loading && (
+          <section className="admin-table-card">
+            <div className="muted" style={{ padding: 16 }}>
+              Loading courses…
+            </div>
+          </section>
+        )}
+
+        {/* Error */}
+        {error && (
+          <section className="admin-table-card">
+            <div style={{ padding: 16 }}>
+              <div style={{ marginBottom: 8 }}>Couldn't load courses.</div>
+              <div className="muted">{error}</div>
+            </div>
+          </section>
+        )}
+
+        {/* Table */}
+        {!loading && !error && (
+          <section className="admin-table-card">
+            <div className="admin-table">
+              <div className="admin-table-row admin-table-header">
+                <div className="admin-cell admin-cell-course">Course</div>
+                <div className="admin-cell admin-cell-professor">Professor</div>
+                <div className="admin-cell admin-cell-skills">Skills</div>
+                <div className="admin-cell admin-cell-competencies">
+                  Competencies
+                </div>
+              </div>
+
+              {filteredRows.map((row) => (
+                <div className="admin-table-row" key={row.id}>
+                  <div className="admin-cell admin-cell-course">
+                    {row.course}
+                    {row.altName && (
+                      <div
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "#64748b",
+                          marginTop: 2,
+                        }}
+                      >
+                        {row.altName}
+                      </div>
+                    )}
+                  </div>
+                  <div className="admin-cell admin-cell-professor">
+                    {row.professor ? (
+                      row.professor
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </div>
+                  <div className="admin-cell admin-cell-skills">
+                    {row.skills.length > 0 ? (
+                      <ul>
+                        {row.skills.map((skill, idx) => (
+                          <li key={idx}>{skill}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="muted">No skills mapped yet</span>
+                    )}
+                  </div>
+                  <div className="admin-cell admin-cell-competencies">
+                    <div className="competency-content">
+                      {row.competencies.length > 0 ? (
+                        <ul>
+                          {row.competencies.map((c, idx) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="muted">
+                          No competencies mapped yet
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="edit-icon-button"
+                        aria-label={`Edit mapping for ${row.course}`}
+                        onClick={() =>
+                          setEditing({ id: row.id, code: row.course })
+                        }
+                      >
+                        <i className="bi bi-pencil-square"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <EditCourseMappingModal
+                isOpen={editing !== null}
+                courseId={editing?.id ?? 0}
+                courseCode={editing?.code ?? ""}
+                professor={
+                  editing
+                    ? ([...rows, ...unassignedRows].find(
+                        (r) => r.id === editing.id,
+                      )?.professor ?? "")
+                    : ""
+                }
+                major={
+                  editing
+                    ? ([...rows, ...unassignedRows].find(
+                        (r) => r.id === editing.id,
+                      )?.major ?? "")
+                    : ""
+                }
+                onClose={() => setEditing(null)}
+                onSaved={() => setRefreshKey((k) => k + 1)}
+                apiFetch={apiFetch}
+                mappingBasePath="/api/faculty"
+              />
+
+              {filteredRows.length === 0 && (
+                <div className="admin-table-row admin-empty-row">
+                  <div className="admin-cell" style={{ gridColumn: "1 / 5" }}>
+                    <span className="muted">
+                      No courses match the selected filter.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Unassigned Courses */}
+        {!loading && !error && (
+          <section className="admin-table-card" style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              onClick={() => setUnassignedOpen((o) => !o)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                background: unassignedOpen ? "#f8fafc" : "#ffffff",
+                border: "none",
+                borderBottom: unassignedOpen ? "1px solid #e2e8f0" : "none",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "background-color 0.2s ease",
+              }}
+              onMouseOver={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f1f5f9")
+              }
+              onMouseOut={(e) =>
+                (e.currentTarget.style.backgroundColor = unassignedOpen
+                  ? "#f8fafc"
+                  : "#ffffff")
+              }
+            >
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#1e293b",
+                  fontSize: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                Unassigned Courses
+                {filteredUnassignedRows.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      background: "#e2e8f0",
+                      color: "#475569",
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                    }}
+                  >
+                    {filteredUnassignedRows.length} available
+                  </span>
+                )}
+              </span>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#64748b",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
+                }}
+              >
+                <span>{unassignedOpen ? "Hide" : "Show"}</span>
+                <i
+                  className={`bi bi-chevron-${unassignedOpen ? "up" : "down"}`}
+                  style={{
+                    color: "#475569",
+                    fontSize: "1.2rem",
+                    strokeWidth: "1px",
+                  }}
+                />
+              </div>
+            </button>
+
+            {unassignedOpen && (
+              <div className="admin-table">
+                <div className="admin-table-row admin-table-header">
+                  <div className="admin-cell admin-cell-course">Course</div>
+                  <div className="admin-cell admin-cell-professor">
+                    Professor
+                  </div>
+                  <div className="admin-cell admin-cell-skills">Skills</div>
+                  <div className="admin-cell admin-cell-competencies">
+                    Competencies
+                  </div>
+                </div>
+
+                {filteredUnassignedRows.map((row) => (
+                  <div className="admin-table-row" key={row.id}>
+                    <div className="admin-cell admin-cell-course">
+                      {row.course}
+                      {row.altName && (
+                        <div
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "#64748b",
+                            marginTop: 2,
+                          }}
+                        >
+                          {row.altName}
+                        </div>
+                      )}
+                    </div>
+                    <div className="admin-cell admin-cell-professor">
+                      <button
+                        type="button"
+                        style={{
+                          background: "#131d43",
+                          color: "#ffffff",
+                          border: "none",
+                          padding: "6px 14px",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                        }}
+                        onClick={async () => {
+                          try {
+                            await apiFetch(
+                              `/api/faculty/courses/${row.id}/claim`,
+                              { method: "PUT" },
+                            );
+                            setRefreshKey((k) => k + 1);
+                          } catch (err) {
+                            alert(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to claim course",
+                            );
+                          }
+                        }}
+                      >
+                        I Teach This Course
+                      </button>
+                    </div>
+                    <div className="admin-cell admin-cell-skills">
+                      {row.skills.length > 0 ? (
+                        <ul>
+                          {row.skills.map((skill, idx) => (
+                            <li key={idx}>{skill}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="muted">No skills mapped yet</span>
+                      )}
+                    </div>
+                    <div className="admin-cell admin-cell-competencies">
+                      <div className="competency-content">
+                        {row.competencies.length > 0 ? (
+                          <ul>
+                            {row.competencies.map((c, idx) => (
+                              <li key={idx}>{c}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="muted">
+                            No competencies mapped yet
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {filteredUnassignedRows.length === 0 && (
+                  <div className="admin-table-row admin-empty-row">
+                    <div className="admin-cell" style={{ gridColumn: "1 / 5" }}>
+                      <span className="muted">
+                        No unassigned courses match the selected filter.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </div>
-    </section>
+
+      <Footer />
+    </div>
   );
 };
 
