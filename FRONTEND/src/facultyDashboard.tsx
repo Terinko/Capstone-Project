@@ -390,7 +390,7 @@ const FacultyDashboard: React.FC = () => {
         {/* Add Course Mapping Form */}
         <section className="card-section">
           <div className="card-surface">
-            <h2>Add Course Mapping</h2>
+            <h2>Add Course Form</h2>
 
             <form onSubmit={addCourse} className="faculty-form">
               <select
