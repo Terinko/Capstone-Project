@@ -12,6 +12,7 @@ import "./FacultyDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import AutofillSkillBox from "./AutofillTextBox";
 import { loadSession, clearSession } from "./Session";
+import AddCourseMappingModal from "./AddCourseMappingModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -374,6 +375,13 @@ const FacultyDashboard: React.FC = () => {
       return true;
     });
   }, [unassignedRows, majorFilter]);
+  
+  const [showAddCourseMappingModal, setShowAddCourseMappingModal] = useState(false);
+  const handleAddCourse = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("BUTTON CLICKED")
+    setShowAddCourseMappingModal(true);
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -502,6 +510,7 @@ const FacultyDashboard: React.FC = () => {
             </form>
           </div>
         </section>
+        <button onClick={handleAddCourse}>Add Course Mapping</button>
 
         {/* Filter bar */}
         <section className="admin-filter-bar">
@@ -863,6 +872,10 @@ const FacultyDashboard: React.FC = () => {
         )}
       </div>
 
+      <AddCourseMappingModal
+        isOpen={showAddCourseMappingModal}
+        onClose={() => setShowAddCourseMappingModal(false)}
+      />
       <Footer />
     </div>
   );

@@ -4,6 +4,13 @@
   gap: 10;
 }
 
+.card-section {
+  margin-bottom: 1.75rem;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 .textbox {
   background-color: white;
 }
