@@ -1,0 +1,20 @@
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.heading {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .faculty-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .add-competency-checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+}
