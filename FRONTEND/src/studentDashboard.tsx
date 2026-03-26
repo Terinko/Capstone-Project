@@ -20,7 +20,18 @@ type MajorOption =
   | "Software Engineering"
   | "Computer Science"
   | "Mechanical Engineering"
+  | "Civil Engineering"
+  | "Engineering"
   | "Industrial Engineering";
+
+const MAJORS: MajorOption[] = [
+  "Engineering",
+  "Software Engineering",
+  "Computer Science",
+  "Mechanical Engineering",
+  "Industrial Engineering",
+  "Civil Engineering",
+];
 
 type GenerationMode = "skills" | "talkingPoints";
 
@@ -246,26 +257,28 @@ Requirements:
   ) => `Act as a technical interview coach.
 
 I will provide skills and tasks learned, grouped by university course.
-Transform them into interview-prep talking points that a student can say out loud in an interview.
+Transform them into interview-ready talking points that a student can say out loud.
 
 ${classBlocks}
 
 Requirements:
 1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
-2. Under each course, create one separate talking point for each provided skill or task.
-3. Do not combine multiple skills into one paragraph or one long response.
-4. Each talking point must be on its own new line.
-5. Write each talking point in first-person language (e.g., "I used...", "I built...", "I implemented...", "I worked with...").
-6. Make each talking point sound natural and interview-ready, as if the student is explaining their experience to an employer.
-7. Mention tools, technologies, concepts, or outcomes when possible, but keep each point concise.
-8. Keep each talking point to 1-2 sentences maximum.
+2. For each skill provided, generate EXACTLY ONE talking point.
+3. Do NOT combine skills together.
+4. Do NOT create multiple talking points for a single skill.
+5. Each talking point must be on its own new line and begin with a dash (-).
+6. Write each talking point in first-person language (e.g., "I built...", "I implemented...", "I worked with...").
+7. Each talking point should:
+   - Clearly explain what was done
+   - Reference tools, technologies, or concepts when possible
+   - Sound natural for an interview response
+8. Keep each talking point concise (1-2 sentences max).
 9. Do not include markdown formatting.
-10. Return plain text only, with course headers followed by individual talking points on separate lines.
+10. Return plain text only.
 
-Important:
-- Preserve the granularity of the input.
-- If a course has 5 listed skills, output 5 separate talking points for that course.
-- Do not summarize the whole course in a single paragraph.
+Strict Rule:
+- If a course has N skills listed, you must return exactly N talking points for that course.
+- Maintain a one-to-one mapping between input skills and output talking points.
 `;
 
   const generateWithAI = async (
