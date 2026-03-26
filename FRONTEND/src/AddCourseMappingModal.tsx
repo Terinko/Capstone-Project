@@ -292,7 +292,7 @@ export default function AddCourseMappingModal({
           <section className="card-section">
             
             <div className="card-surface">
-              <h2>Add Course Mapping</h2>
+              <h3 className="heading">Add Course</h3>
 
               <form onSubmit={addCourse} className="add-form">
                 <select
