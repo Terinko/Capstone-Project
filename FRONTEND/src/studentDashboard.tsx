@@ -20,7 +20,18 @@ type MajorOption =
   | "Software Engineering"
   | "Computer Science"
   | "Mechanical Engineering"
+  | "Civil Engineering"
+  | "Engineering"
   | "Industrial Engineering";
+
+const MAJORS: MajorOption[] = [
+  "Engineering",
+  "Software Engineering",
+  "Computer Science",
+  "Mechanical Engineering",
+  "Industrial Engineering",
+  "Civil Engineering",
+];
 
 type GenerationMode = "skills" | "talkingPoints";
 

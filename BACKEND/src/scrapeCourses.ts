@@ -30,6 +30,7 @@ const supabase = createClient(
 
 // ── Map: Major name (matches your Majors table) → catalog URL slug ───────────
 const MAJORS: Record<string, string> = {
+  "Engineering": "enr",
   "Software Engineering": "ser",
   "Computer Science": "csc",
   "Mechanical Engineering": "mer",
