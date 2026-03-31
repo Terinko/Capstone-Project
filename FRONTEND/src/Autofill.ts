@@ -124,7 +124,7 @@ export function searchAutofill(
     .filter((it) => (majorOnly ? it.majorMatch === true : true))
     .map((item) => ({
       item,
-      score: scoreName(item.Skill_name, q) + (item.majorMatch ? 25 : 0),
+      score: scoreName(item.Skill_name, q) + (item.majorMatch ? 150 : 0),
     }))
     .filter((x) => x.score > 0)
     .sort(

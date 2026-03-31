@@ -16,6 +16,8 @@ import {
   createSkillWithName,
   findSkillByName,
 } from "../Models/SkillsModel.js";
+import { findMajorByName } from "../Models/MajorModel.js";
+import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
 
 export const adminCoursesRouter = Router();
 
@@ -174,14 +176,26 @@ adminCoursesRouter.get(
 adminCoursesRouter.post("/skills", async (req: Request, res: Response) => {
   try {
     const name = (req.body?.name as string | undefined)?.trim();
+    const majorName = (req.body?.major as string | undefined)?.trim();
 
     if (!name) {
       return res.status(400).json({ error: "Name is required" });
     }
 
-    // safeguard: block duplicates (skills only)
+    if (!majorName) {
+      return res.status(400).json({ error: "Major is required" });
+    }
+
+    const major = await findMajorByName(majorName);
+    if (!major) {
+      return res.status(400).json({ error: `Major not found: ${majorName}` });
+    }
+
+    // If skill already exists, reuse it and still map it to the major
     const existing = await findSkillByName(name);
     if (existing) {
+      await linkSkillToMajor(existing.Skill_Id, major.id);
+
       return res.status(409).json({
         error: "Skill name already exists",
         existing,
@@ -189,23 +203,15 @@ adminCoursesRouter.post("/skills", async (req: Request, res: Response) => {
     }
 
     const created = await createSkillWithName(name);
+
+    await linkSkillToMajor(created.Skill_Id, major.id);
+
     res.status(201).json(created);
   } catch (e: any) {
     console.error("POST /api/admin/skills failed:", e);
     res.status(500).json({ error: e?.message ?? "Unknown error" });
   }
 });
-
-// Skills should NOT be deleted anymore.
-adminCoursesRouter.delete(
-  "/skills/:skillId",
-  async (_req: Request, res: Response) => {
-    return res.status(405).json({
-      error:
-        "Deleting Skills is disabled. Update a course's mapping (PUT /courses/:courseId/mapping) to remove skills from that course.",
-    });
-  },
-);
 
 /**
  * PUT /api/admin/courses/:courseId

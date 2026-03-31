@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import "./EditCourseMappingModal.css";
+import { searchAutofill } from "./Autofill";
 
 /**
  * Represents a Skill or Competency option returned from the backend.
@@ -154,28 +155,35 @@ export default function EditCourseMappingModal({
   const skillSuggestions = useMemo(() => {
     if (!options) return [];
 
-    const q = newSkillName.trim().toLowerCase();
-    if (!q) return [];
+    const dataset = {
+      scope: "all" as const,
+      major: major ? { id: 0, name: major } : null,
+      skills: options.skills.map((s) => ({
+        ...s,
+        majorMatch: !!s.majorMatch,
+      })),
+      competencies: options.competencies.map((c) => ({
+        ...c,
+        majorMatch: !!c.majorMatch,
+      })),
+    };
 
     const selected = new Set(selectedSkillIds);
     const pending = new Set(
       pendingSkillNames.map((n) => n.trim().toLowerCase()),
     );
 
-    return options.skills
-      .filter((s) => {
-        // limit suggestions to major skills only
-        if (!s.majorMatch) return false;
-
-        const name = s.Skill_name.trim().toLowerCase();
-        if (selected.has(s.Skill_Id)) return false;
-        if (pending.has(name)) return false;
-
-        return name.includes(q);
-      })
-      .slice(0, 10);
-  }, [options, newSkillName, selectedSkillIds, pendingSkillNames]);
-
+    return searchAutofill(dataset, newSkillName, {
+      type: "skill",
+      limit: 5,
+      majorOnly: false,
+    }).filter((s) => {
+      const name = s.Skill_name.trim().toLowerCase();
+      if (selected.has(s.Skill_Id)) return false;
+      if (pending.has(name)) return false;
+      return true;
+    });
+  }, [options, major, newSkillName, selectedSkillIds, pendingSkillNames]);
   /**
    * Create a new Skill using the provided description.
    * If the backend reports it already exists, reuse it.
@@ -258,7 +266,10 @@ export default function EditCourseMappingModal({
           try {
             const created = await apiFetch<Option>("/api/admin/skills", {
               method: "POST",
-              body: JSON.stringify({ name }),
+              body: JSON.stringify({
+                name,
+                major,
+              }),
             });
             newSkillIds.push(created.Skill_Id);
           } catch (e: any) {

@@ -14,9 +14,7 @@ export async function getSkillIdsForMajor(majorId: number): Promise<number[]> {
  * Returns Skills rows for a major (joined through Skill_Major_Mapping).
  * Adds majorMatch: true.
  */
-export async function getSkillsForMajor(
-  majorId: number,
-): Promise<
+export async function getSkillsForMajor(majorId: number): Promise<
   Array<{
     Skill_Id: number;
     Skill_name: string;
@@ -48,4 +46,14 @@ export async function getSkillsForMajor(
     seen.add(s.Skill_Id);
     return true;
   });
+}
+
+export async function linkSkillToMajor(skillId: number, majorId: number) {
+  const { error } = await supabase
+    .from("Skill_Major_Mapping")
+    .upsert([{ Skill_id: skillId, Major_id: majorId }], {
+      onConflict: "Skill_id,Major_id",
+    });
+
+  if (error) throw new Error(error.message);
 }

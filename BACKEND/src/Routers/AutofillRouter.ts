@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { findMajorByName } from "../Models/MajorsModel.js";
+import { findMajorByName } from "../Models/MajorModel.js";
 import {
   getSkillIdsForMajor,
   getSkillsForMajor,
@@ -19,11 +19,9 @@ autofillRouter.get("/skills-dataset", async (req: Request, res: Response) => {
     if (scope === "major") {
       const majorName = (req.query.major as string | undefined)?.trim();
       if (!majorName) {
-        return res
-          .status(400)
-          .json({
-            error: "Missing required query param: major (when scope=major)",
-          });
+        return res.status(400).json({
+          error: "Missing required query param: major (when scope=major)",
+        });
       }
 
       const major = await findMajorByName(majorName);
