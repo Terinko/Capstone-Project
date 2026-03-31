@@ -23,6 +23,7 @@ type MajorOption = string;
 interface FacultyCourseRow {
   id: number;
   course: string;
+  courseName: string;
   altName: string | null;
   major: string;
   professor: string;
@@ -96,7 +97,7 @@ const FacultyDashboard: React.FC = () => {
 
   // ── Add Course Form state ────────────────────────────────────────────────
   const MAJOR_PREFIX_MAP: Record<string, string> = {
-    "Engineering": "ENR",
+    Engineering: "ENR",
     "Software Engineering": "SER",
     "Computer Science": "CSC",
     "Mechanical Engineering": "MER",
@@ -376,11 +377,12 @@ const FacultyDashboard: React.FC = () => {
       return true;
     });
   }, [unassignedRows, majorFilter]);
-  
-  const [showAddCourseMappingModal, setShowAddCourseMappingModal] = useState(false);
+
+  const [showAddCourseMappingModal, setShowAddCourseMappingModal] =
+    useState(false);
   const handleAddCourse = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("BUTTON CLICKED")
+    console.log("BUTTON CLICKED");
     setShowAddCourseMappingModal(true);
   };
 
@@ -593,18 +595,22 @@ const FacultyDashboard: React.FC = () => {
               {filteredRows.map((row) => (
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
-                    {row.course}
-                    {row.altName && (
-                      <div
-                        style={{
-                          fontSize: "0.78rem",
-                          color: "#64748b",
-                          marginTop: 2,
-                        }}
-                      >
-                        {row.altName}
-                      </div>
-                    )}
+                    <div className="admin-cell admin-cell-course">
+                      <div className="course-code">{row.course}</div>
+
+                      {(row.altName || row.courseName) && (
+                        <div
+                          className="course-name"
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "#64748b",
+                            marginTop: 2,
+                          }}
+                        >
+                          {row.altName || row.courseName}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="admin-cell admin-cell-professor">
                     {row.professor ? (
@@ -782,16 +788,18 @@ const FacultyDashboard: React.FC = () => {
                 {filteredUnassignedRows.map((row) => (
                   <div className="admin-table-row" key={row.id}>
                     <div className="admin-cell admin-cell-course">
-                      {row.course}
-                      {row.altName && (
+                      <div className="course-code">{row.course}</div>
+
+                      {(row.altName || row.courseName) && (
                         <div
+                          className="course-name"
                           style={{
                             fontSize: "0.78rem",
                             color: "#64748b",
                             marginTop: 2,
                           }}
                         >
-                          {row.altName}
+                          {row.altName || row.courseName}
                         </div>
                       )}
                     </div>

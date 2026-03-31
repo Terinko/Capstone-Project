@@ -86,6 +86,7 @@ facultyCoursesRouter.get("/courses", async (req: Request, res: Response) => {
         return {
           id: c.Course_Id,
           course: c.Course_Code,
+          courseName: c.Course_Name,
           altName: c.Course_Name_Alt ?? null,
           major: c.Major,
           professor: c.Professor ?? "",
@@ -311,6 +312,7 @@ facultyCoursesRouter.get(
           return {
             id: c.Course_Id,
             course: c.Course_Code,
+            courseName: c.Course_Name,
             altName: c.Course_Name_Alt ?? null,
             major: c.Major,
             professor: c.Professor ?? "",

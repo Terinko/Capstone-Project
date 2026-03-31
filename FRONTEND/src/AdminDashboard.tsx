@@ -11,6 +11,8 @@ type CompletionFilter = "All" | "Mapped" | "Unmapped";
 interface AdminCourseRow {
   id: number;
   course: string;
+  courseName: string;
+  altName: string | null;
   major: string;
   professor: string;
   completion: CompletionStatus;
@@ -232,7 +234,13 @@ const AdminDashboard: React.FC = () => {
               {filteredRows.map((row) => (
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
-                    {row.course}
+                    <div className="course-code">{row.course}</div>
+
+                    {(row.altName || row.courseName) && (
+                      <div className="course-name">
+                        {row.altName || row.courseName}
+                      </div>
+                    )}
                   </div>
                   <div className="admin-cell admin-cell-professor">
                     {row.professor ? (

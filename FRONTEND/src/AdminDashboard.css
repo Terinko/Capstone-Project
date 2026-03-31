@@ -124,8 +124,16 @@
 
 .admin-cell-course {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: column;
+}
+
+.course-code {
+  font-weight: 600;
+}
+
+.course-name {
+  font-size: 0.85rem;
+  color: #666;
 }
 
 /* UL items inside skills stay left too */
