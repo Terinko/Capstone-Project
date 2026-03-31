@@ -61,6 +61,7 @@ export default function AddCourseMappingModal({
   
   // ── Add Course Form state ────────────────────────────────────────────────
   const MAJOR_PREFIX_MAP: Record<string, string> = {
+    "Engineering": "ENR",
     "Software Engineering": "SER",
     "Computer Science": "CSC",
     "Mechanical Engineering": "MER",
