@@ -44,6 +44,7 @@ interface CourseOffering {
 
 interface ClassOption {
   courseCode: string;
+  courseName: string;
   offerings: CourseOffering[];
 }
 
@@ -488,7 +489,13 @@ Strict Rule:
                             checked={isChecked}
                             onChange={() => toggleCourse(course.courseCode)}
                           />
-                          <span>{course.courseCode}</span>
+                          <span>
+                            {course.courseCode}
+                            <br />
+                            <small style={{ color: "#6b7280" }}>
+                              {course.courseName}
+                            </small>
+                          </span>
                           {needsPick && (
                             <span
                               style={{

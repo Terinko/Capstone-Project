@@ -59,26 +59,45 @@ export async function getAllCourses() {
 export async function getCoursesByMajor(major: string) {
   const { data, error } = await supabase
     .from("Courses")
-    .select("Course_Id, Course_Code, Course_Name_Alt")
+    .select("Course_Id, Course_Code, Course_Name, Course_Name_Alt")
     .eq("Major", major)
     .order("Course_Code", { ascending: true });
 
   if (error) throw error;
 
-  const groupMap: Record<string, { id: string; altName: string | null }[]> = {};
+  const groupMap: Record<
+    string,
+    {
+      courseName: string;
+      offerings: { id: string; altName: string | null }[];
+    }
+  > = {};
 
   for (const row of data ?? []) {
-    const existing = groupMap[row.Course_Code] ?? [];
-    existing.push({
-      id: String(row.Course_Id),
-      altName: row.Course_Name_Alt ?? null,
-    });
-    groupMap[row.Course_Code] = existing;
+    const existing = groupMap[row.Course_Code];
+
+    if (!existing) {
+      groupMap[row.Course_Code] = {
+        courseName: row.Course_Name ?? row.Course_Code,
+        offerings: [
+          {
+            id: String(row.Course_Id),
+            altName: row.Course_Name_Alt ?? null,
+          },
+        ],
+      };
+    } else {
+      existing.offerings.push({
+        id: String(row.Course_Id),
+        altName: row.Course_Name_Alt ?? null,
+      });
+    }
   }
 
-  return Object.entries(groupMap).map(([courseCode, offerings]) => ({
+  return Object.entries(groupMap).map(([courseCode, value]) => ({
     courseCode,
-    offerings,
+    courseName: value.courseName,
+    offerings: value.offerings,
   }));
 }
 

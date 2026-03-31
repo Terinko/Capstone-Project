@@ -45,6 +45,7 @@ app.get("/courses", async (req: Request, res: Response) => {
       string,
       {
         courseCode: string;
+        courseName: string;
         offerings: { id: string; altName: string | null }[];
       }[]
     > = {};
