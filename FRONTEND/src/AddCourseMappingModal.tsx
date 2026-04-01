@@ -10,6 +10,7 @@ import AutofillSkillBox from "./AutofillTextBox";
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  onSaved: () => void;
 };
 
 type MajorOption = string;
@@ -57,8 +58,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export default function AddCourseMappingModal({
   isOpen,
   onClose,
+  onSaved,
 }: Props) {
-  
   // ── Add Course Form state ────────────────────────────────────────────────
   const MAJOR_PREFIX_MAP: Record<string, string> = {
     "Software Engineering": "SER",
@@ -150,7 +151,7 @@ export default function AddCourseMappingModal({
   );
   const [formMajors, setFormMajors] = useState<string[]>([]);
   const [prefixError, setPrefixError] = useState<string | null>(null);
-  
+
   const parseSkillNames = (value: string): string[] =>
     value
       .split(",")
@@ -206,6 +207,7 @@ export default function AddCourseMappingModal({
           competencyIds: selectedCompetencyIds,
         }),
       });
+      onSaved();
 
       setCourseCode("");
       setCourseTitle("");
@@ -290,7 +292,6 @@ export default function AddCourseMappingModal({
       >
         <div className="modal-content">
           <section className="card-section">
-            
             <div className="card-surface">
               <h3 className="heading">Add Course</h3>
 
@@ -392,7 +393,9 @@ export default function AddCourseMappingModal({
                 </div>
 
                 {formError && <div className="form-error">{formError}</div>}
-                {formSuccess && <div className="form-success">{formSuccess}</div>}
+                {formSuccess && (
+                  <div className="form-success">{formSuccess}</div>
+                )}
 
                 <button
                   type="submit"
@@ -403,11 +406,9 @@ export default function AddCourseMappingModal({
                 </button>
               </form>
             </div>
-
-
           </section>
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -440,6 +440,18 @@ const FacultyDashboard: React.FC = () => {
               </button>
             </div>
           </div>
+          <button
+            onClick={handleAddCourse}
+            type="button"
+            className="faculty-submit-button"
+            style={{
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+              background: "#131d43",
+            }}
+          >
+            Create Course
+          </button>
         </section>
 
         {/* Loading */}
@@ -765,6 +777,10 @@ const FacultyDashboard: React.FC = () => {
       <AddCourseMappingModal
         isOpen={showAddCourseMappingModal}
         onClose={() => setShowAddCourseMappingModal(false)}
+        onSaved={() => {
+          setShowAddCourseMappingModal(false);
+          setRefreshKey((k) => k + 1);
+        }}
       />
       <Footer />
     </div>

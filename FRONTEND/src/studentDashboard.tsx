@@ -67,7 +67,6 @@ const StudentDashboard: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
-  const [showRawSkills, setShowRawSkills] = useState<boolean>(false);
   const [generationMode, setGenerationMode] =
     useState<GenerationMode>("skills");
 
@@ -376,14 +375,6 @@ Strict Rule:
     if (Object.keys(skillsByClass).length === 0) {
       setBullets(["No skills found in the database for the selected classes."]);
       return;
-    }
-
-    if (showRawSkills) {
-      const flat = Object.entries(skillsByClass).flatMap(([course, skills]) => [
-        `${course}:`,
-        ...skills,
-      ]);
-      setBullets(flat);
     } else {
       generateWithAI(skillsByClass, generationMode);
     }
@@ -469,47 +460,44 @@ Strict Rule:
                 </p>
               ) : availableClasses && availableClasses.length > 0 ? (
                 <div className="class-grid">
-                  {availableClasses.map((course) => {
+                  {availableClasses.map((course, index) => {
                     const isChecked = checkedCodes.has(course.courseCode);
                     const hasMany = course.offerings.length > 1;
                     const resolvedId = getResolvedId(course);
                     const needsPick =
                       isChecked && hasMany && resolvedId === null;
 
+                    const firstIndexForCode = availableClasses.findIndex(
+                      (c) => c.courseCode === course.courseCode,
+                    );
+                    const showVersionRow =
+                      isChecked && hasMany && firstIndexForCode === index;
+
                     return (
                       <div
-                        key={course.courseCode}
+                        key={`${course.courseCode}-${index}`}
                         style={{ display: "contents" }}
                       >
-                        <label
-                          className={`class-option${isChecked ? " checked" : ""}`}
+                        <button
+                          type="button"
+                          className={`class-option-box${isChecked ? " selected" : ""}`}
+                          onClick={() => toggleCourse(course.courseCode)}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleCourse(course.courseCode)}
-                          />
-                          <span>
-                            {course.courseCode}
-                            <br />
-                            <small style={{ color: "#6b7280" }}>
-                              {course.courseName}
-                            </small>
-                          </span>
-                          {needsPick && (
-                            <span
-                              style={{
-                                color: "#f59e0b",
-                                fontWeight: 700,
-                                marginLeft: 2,
-                              }}
-                            >
-                              !
+                          <div className="class-option-code-row">
+                            <span className="class-option-code">
+                              {course.courseCode}
                             </span>
-                          )}
-                        </label>
+                            {needsPick && (
+                              <span className="class-option-warning">!</span>
+                            )}
+                          </div>
 
-                        {isChecked && hasMany && (
+                          <div className="class-option-name">
+                            {course.courseName}
+                          </div>
+                        </button>
+
+                        {showVersionRow && (
                           <div className="offering-sub-row">
                             <span className="offering-sub-label">
                               Which version?
@@ -518,6 +506,7 @@ Strict Rule:
                               const isSelected =
                                 versionSelections[course.courseCode] ===
                                 offering.id;
+
                               return (
                                 <button
                                   key={offering.id}
@@ -621,25 +610,6 @@ Strict Rule:
                     Talking Points
                   </span>
                 </div>
-
-                {/* KEEP THIS (your raw skills toggle stays) */}
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    cursor: "pointer",
-                    fontSize: "0.9rem",
-                    color: "#64748b",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={showRawSkills}
-                    onChange={(e) => setShowRawSkills(e.target.checked)}
-                  />
-                  Tech Demo: Show Raw Skills
-                </label>
               </div>
 
               <button
@@ -662,11 +632,9 @@ Strict Rule:
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">
-                {showRawSkills
-                  ? "Raw Skills (Tech Demo):"
-                  : generationMode === "skills"
-                    ? "Generated Bullet Points:"
-                    : "Generated Talking Points:"}
+                {generationMode === "skills"
+                  ? "Generated Bullet Points:"
+                  : "Generated Talking Points:"}
               </h2>
 
               <div className="bullets-button">
