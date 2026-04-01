@@ -434,11 +434,6 @@ const FacultyDashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div className="filter-left flex justify-start items-center space-x-4">
-              <button onClick={handleAddCourse} className="buttons px-4 py-2">
-                Add Course
-              </button>
-            </div>
           </div>
           <button
             onClick={handleAddCourse}
