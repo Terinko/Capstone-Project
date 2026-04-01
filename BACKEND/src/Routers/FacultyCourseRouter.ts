@@ -24,6 +24,8 @@ import {
   findPairedCoursesByCodeAndProfessor,
   updateCrossMajorMatchingCoursesByCodeAndProfessor,
 } from "../Models/CoursesModel.js";
+import { findMajorByName } from "../Models/MajorModel.js";
+import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
 
 export const facultyCoursesRouter = Router();
 
@@ -423,6 +425,11 @@ facultyCoursesRouter.post(
         });
       }
 
+      const resolvedMajor = await findMajorByName(major);
+      if (!resolvedMajor) {
+        return res.status(400).json({ error: `Major not found: ${major}` });
+      }
+
       const rawSkillNames = Array.isArray(req.body.skillNames)
         ? req.body.skillNames
         : [];
@@ -440,10 +447,14 @@ facultyCoursesRouter.post(
         const existingSkill = await findSkillByName(normalizedSkillName);
 
         if (existingSkill?.Skill_Id) {
-          resolvedSkillIds.push(Number(existingSkill.Skill_Id));
+          const skillId = Number(existingSkill.Skill_Id);
+          resolvedSkillIds.push(skillId);
+          await linkSkillToMajor(skillId, resolvedMajor.id);
         } else {
           const createdSkill = await createSkillWithName(normalizedSkillName);
-          resolvedSkillIds.push(Number(createdSkill.Skill_Id));
+          const skillId = Number(createdSkill.Skill_Id);
+          resolvedSkillIds.push(skillId);
+          await linkSkillToMajor(skillId, resolvedMajor.id);
         }
       }
 

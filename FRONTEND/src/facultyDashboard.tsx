@@ -398,12 +398,6 @@ const FacultyDashboard: React.FC = () => {
           <p className="admin-subtitle">Manage your course mappings.</p>
         </section>
 
-        {/* Add Course Mapping Form */}
-        <section>
-        <button onClick={handleAddCourse} className="buttons px-4 py-2">Add Course</button>
-        </section>
-        <br/>
-
         {/* Filter bar */}
         <section className="admin-filter-bar">
           <div className="filter-left">
@@ -448,6 +442,18 @@ const FacultyDashboard: React.FC = () => {
               </select>
             </div>
           </div>
+          <button
+            onClick={handleAddCourse}
+            type="button"
+            className="faculty-submit-button"
+            style={{
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+              background: "#131d43",
+            }}
+          >
+            Create Course
+          </button>
         </section>
 
         {/* Loading */}
@@ -773,6 +779,10 @@ const FacultyDashboard: React.FC = () => {
       <AddCourseMappingModal
         isOpen={showAddCourseMappingModal}
         onClose={() => setShowAddCourseMappingModal(false)}
+        onSaved={() => {
+          setShowAddCourseMappingModal(false);
+          setRefreshKey((k) => k + 1);
+        }}
       />
       <Footer />
     </div>
