@@ -444,8 +444,8 @@ Strict Rule:
                 }}
               >
                 {
-                  MAJORS.map((major) => (
-                    <option value={major}>{ major }</option>
+                  MAJORS.map((major, index) => (
+                    <option key={index} value={major}>{ major }</option>
                   ))
                 }
               </select>
