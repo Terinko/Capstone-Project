@@ -51,15 +51,6 @@ const App: React.FC = () => {
               Add High Quality Talking Points To Your Resume
             </h2>
 
-            <p
-              className="text-muted mb-4"
-              style={{ maxWidth: "38rem", margin: "0 auto" }}
-            >
-              Use previously taken classes and prior work experience to map your
-              academic skills to career-ready and technical skills for your
-              resume in minutes!
-            </p>
-
             <div className="cta-buttons">
               <button
                 type="button"
@@ -96,7 +87,6 @@ const App: React.FC = () => {
         showModal={showForgotPasswordModal}
         onClose={() => setShowForgotPasswordModal(false)}
       />
-      
     </div>
   );
 };

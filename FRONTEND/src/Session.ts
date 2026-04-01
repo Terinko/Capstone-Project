@@ -20,7 +20,40 @@ export function loadSession(): Session | null {
   }
 }
 
-export function clearSession(): void {
+export async function clearSession(): Promise<void> {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+
+  if (raw) {
+    try {
+      const session = JSON.parse(raw) as Session;
+      const API_BASE =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+      // Decode the JWT payload to get the user's ID
+      const payload = JSON.parse(atob(session.token.split(".")[1]));
+
+      // Map the JWT userType to match your AuditLogs database format
+      let mappedUserType = "STUDENT";
+      if (payload.userType === "Administrator") mappedUserType = "ADMIN";
+      if (payload.userType === "Faculty/Administrator")
+        mappedUserType = "FACULTY";
+
+      // Tell the backend to record the LOGOUT action
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: payload.userId,
+          email: payload.userEmail,
+          user_type: mappedUserType,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to record logout audit log:", error);
+    }
+  }
+
+  // Finally, wipe the local browser memory
   sessionStorage.removeItem(SESSION_KEY);
 }
 

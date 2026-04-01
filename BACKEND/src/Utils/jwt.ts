@@ -4,7 +4,8 @@ const SECRET = process.env.JWT_SECRET;
 if (!SECRET) throw new Error("JWT_SECRET env variable is not set");
 const JWT_SECRET: string = SECRET;
 
-const EXPIRES_IN = "8h"; // Token expires after 8 hours
+// Changed from "8h" to "30m" to minimize the attack window if a token is compromised
+const EXPIRES_IN = "1h";
 
 export interface TokenPayload {
   userId: number;

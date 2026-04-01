@@ -23,8 +23,9 @@ const Navbar: React.FC = () => {
     }
   };
 
-  const handleSignOut = () => {
-    clearSession();
+  // NEW: Make this function async so it can wait for the audit log to save
+  const handleSignOut = async () => {
+    await clearSession();
     setUserType(null);
     navigate("/");
   };

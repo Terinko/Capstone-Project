@@ -1,16 +1,9 @@
 // src/facultyDashboard.tsx
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
+import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 import Footer from "./footer";
 import Navbar from "./Navbar";
 import "./FacultyDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
-import AutofillSkillBox from "./AutofillTextBox";
 import { loadSession, clearSession } from "./Session";
 import AddCourseMappingModal from "./AddCourseMappingModal";
 
@@ -108,7 +101,7 @@ const FacultyDashboard: React.FC = () => {
   const [selectedMajor, setSelectedMajor] = useState<MajorOption>(
     "Software Engineering",
   );
-  const [formMajors, setFormMajors] = useState<string[]>([]);
+  const [, setFormMajors] = useState<string[]>([]);
   const [prefixError, setPrefixError] = useState<string | null>(null);
 
   const [alternateCourseTitle, setAlternateCourseTitle] = useState("");
@@ -398,12 +391,6 @@ const FacultyDashboard: React.FC = () => {
           <p className="admin-subtitle">Manage your course mappings.</p>
         </section>
 
-        {/* Add Course Mapping Form */}
-        <section>
-        <button onClick={handleAddCourse} className="buttons px-4 py-2">Add Course</button>
-        </section>
-        <br/>
-
         {/* Filter bar */}
         <section className="admin-filter-bar">
           <div className="filter-left">
@@ -446,6 +433,11 @@ const FacultyDashboard: React.FC = () => {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="filter-left flex justify-start items-center space-x-4">
+              <button onClick={handleAddCourse} className="buttons px-4 py-2">
+                Add Course
+              </button>
             </div>
           </div>
         </section>

@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import "./AdminDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
+import AuditLogs from "./components/auditLogs.tsx";
 
 type CompletionStatus = "Mapped" | "Unmapped";
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
@@ -83,7 +84,7 @@ const AdminDashboard: React.FC = () => {
     const fetchMajors = async () => {
       try {
         // We use the public /courses endpoint which groups courses by Major
-        const data = await apiFetch<Record<string, any>>("/courses");
+        const data = await apiFetch<Record<string, unknown>>("/courses");
         const dynamicMajors = Object.keys(data);
 
         if (dynamicMajors.length > 0) {
@@ -150,6 +151,7 @@ const AdminDashboard: React.FC = () => {
         <section className="admin-header">
           <h1 className="admin-title">Admin Dashboard</h1>
           <p className="admin-subtitle">Everything you need, in one place.</p>
+          <AuditLogs />
         </section>
 
         <section className="admin-filter-bar">
