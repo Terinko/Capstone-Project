@@ -435,16 +435,11 @@ Strict Rule:
                   setErrorMsg(null);
                 }}
               >
-                <option value="Software Engineering">
-                  Software Engineering
-                </option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Mechanical Engineering">
-                  Mechanical Engineering
-                </option>
-                <option value="Industrial Engineering">
-                  Industrial Engineering
-                </option>
+                {
+                  MAJORS.map((major, index) => (
+                    <option key={index} value={major}>{ major }</option>
+                  ))
+                }
               </select>
             </div>
 
