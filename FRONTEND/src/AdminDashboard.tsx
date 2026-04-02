@@ -307,6 +307,7 @@ const AdminDashboard: React.FC = () => {
                 onClose={() => setEditing(null)}
                 onSaved={() => setRefreshKey((k) => k + 1)}
                 apiFetch={apiFetch}
+                isAdmin={true}
               />
 
               {filteredRows.length === 0 && (

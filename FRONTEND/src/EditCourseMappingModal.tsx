@@ -46,6 +46,7 @@ type Props = {
   apiFetch: <T>(path: string, init?: RequestInit) => Promise<T>;
   /** Base path for course mapping endpoints. Defaults to /api/admin */
   mappingBasePath?: string;
+  isAdmin: boolean;
 };
 
 export default function EditCourseMappingModal({
@@ -58,6 +59,7 @@ export default function EditCourseMappingModal({
   onSaved,
   apiFetch,
   mappingBasePath = "/api/admin",
+  isAdmin,
 }: Props) {
   /* -------------------- UI state -------------------- */
   const [loading, setLoading] = useState(false);
@@ -73,6 +75,7 @@ export default function EditCourseMappingModal({
   );
 
   /* -------------------- Form state -------------------- */
+  const [newProfessorName, setNewProfessorName] = useState("");
   const [newSkillName, setNewSkillName] = useState("");
   const [competencySearch, setCompetencySearch] = useState("");
   const [pendingSkillNames, setPendingSkillNames] = useState<string[]>([]);
@@ -84,6 +87,7 @@ export default function EditCourseMappingModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    setNewProfessorName(professor);
     setPendingSkillNames([]);
 
     let cancelled = false;
@@ -227,6 +231,11 @@ export default function EditCourseMappingModal({
     setNewSkillName("");
   }
 
+  function handleDeleteProfessor() {
+    if (!isAdmin) return;
+
+    setNewProfessorName("N/A");
+  }
   /**
    * Permanently delete a skill from the system.
    * Confirmation is required because this affects all courses.
@@ -295,13 +304,21 @@ export default function EditCourseMappingModal({
       );
 
       // 2) Update the mapping
-      await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
-        method: "PUT",
-        body: JSON.stringify({
-          skillIds: mergedSkillIds,
-          competencyIds: selectedCompetencyIds,
-        }),
-      });
+        await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
+          method: "PUT",
+          body: JSON.stringify({
+            skillIds: mergedSkillIds,
+            competencyIds: selectedCompetencyIds,
+          }),
+        });
+      if (isAdmin) {
+        await apiFetch(`${mappingBasePath}/courses/${courseId}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            professor: newProfessorName
+          }),
+        });
+      }
 
       setPendingSkillNames([]);
       onSaved();
@@ -394,7 +411,7 @@ export default function EditCourseMappingModal({
                     </label>
                     <input
                       className="edit-modal-input"
-                      value={professor || "Unassigned"}
+                      value={newProfessorName || "Unassigned"}
                       disabled
                       style={{
                         backgroundColor: "#f8fafc",
@@ -402,6 +419,17 @@ export default function EditCourseMappingModal({
                         cursor: "not-allowed",
                       }}
                     />
+                    {isAdmin && (
+                      <div className="edit-modal-card-actions">
+                        <button
+                          className="btn-primary"
+                          onClick={handleDeleteProfessor}
+                          disabled={newProfessorName.trim() === "" || newProfessorName.trim() === "N/A"}
+                        >
+                          Delete Professor
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

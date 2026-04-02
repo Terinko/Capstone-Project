@@ -569,6 +569,7 @@ const FacultyDashboard: React.FC = () => {
                 onSaved={() => setRefreshKey((k) => k + 1)}
                 apiFetch={apiFetch}
                 mappingBasePath="/api/faculty"
+                isAdmin={false}
               />
 
               {filteredRows.length === 0 && (
