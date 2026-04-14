@@ -79,7 +79,7 @@ const StudentDashboard: React.FC = () => {
   useEffect(() => {
     const fetchMajorClasses = async () => {
       try {
-        const response = await fetch("http://localhost:3001/courses");
+        const response = await fetch("https://stowaway-reword-isotope.ngrok-free.dev/courses");
         if (!response.ok) {
           throw new Error(`Server error: ${response.status}`);
         }
