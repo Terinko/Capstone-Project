@@ -1,13 +1,14 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import path from "path"; // ← NEW: Imported path module
 import { adminCoursesRouter } from "./Routers/AdminCourseRouter.js";
 import { RequireAdmin, RequireAuth } from "./Middleware/RequireAuth.js";
 import { getAllCourses, getCoursesByMajor } from "./Models/CoursesModel.js";
 import { authRouter } from "./Routers/AuthRouter.js";
 import { createAccountRouter } from "./Routers/CreateAccountRouter.js";
 import { authProfileRouter } from "./Routers/AuthProfileRouter.js";
-import { forgotPasswordRouter } from "./Routers/ForgotPasswordRouter.js"; // ← NEW
+import { forgotPasswordRouter } from "./Routers/ForgotPasswordRouter.js";
 import { autofillRouter } from "./Routers/AutofillRouter.js";
 import { facultyCoursesRouter } from "./Routers/FacultyCourseRouter.js";
 import AuditRouter from "./Routers/AuditRouter.js";
@@ -41,8 +42,6 @@ app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 app.get("/courses", async (req: Request, res: Response) => {
   try {
     const courses = await getAllCourses();
-
-    // Derive the list of majors present in the DB dynamically
     const majors = [...new Set(courses.map((c) => c.Major))].sort();
 
     const grouped: Record<
@@ -63,6 +62,17 @@ app.get("/courses", async (req: Request, res: Response) => {
     console.error("Error fetching courses:", error);
     res.status(500).json({ error: "Failed to fetch courses" });
   }
+});
+
+// ← NEW: Serve static frontend files directly from the FRONTEND/dist folder
+// This assumes you run your server from the root of the BACKEND directory
+const frontendDistPath = path.join(process.cwd(), "../FRONTEND/dist");
+app.use(express.static(frontendDistPath));
+
+// ← NEW: Catch-all route to handle React Router SPA routing
+// MUST be placed AFTER API routes, but BEFORE the error handler
+app.get(/(.*)/, (req: Request, res: Response) => {
+  res.sendFile(path.join(frontendDistPath, "index.html"));
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

@@ -83,7 +83,7 @@ const StudentDashboard: React.FC = () => {
   useEffect(() => {
     const fetchMajorClasses = async () => {
       try {
-        const response = await fetch("http://localhost:3001/courses");
+        const response = await fetch(API_BASE_URL + "/courses");
         if (!response.ok) {
           throw new Error(`Server error: ${response.status}`);
         }
