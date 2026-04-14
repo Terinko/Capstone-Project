@@ -445,7 +445,7 @@ const FacultyDashboard: React.FC = () => {
               background: "#131d43",
             }}
           >
-            Create Course
+            Add Course
           </button>
         </section>
 

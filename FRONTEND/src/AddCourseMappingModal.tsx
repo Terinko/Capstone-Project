@@ -62,7 +62,7 @@ export default function AddCourseMappingModal({
 }: Props) {
   // ── Add Course Form state ────────────────────────────────────────────────
   const MAJOR_PREFIX_MAP: Record<string, string> = {
-    "Engineering": "ENR",
+    Engineering: "ENR",
     "Software Engineering": "SER",
     "Computer Science": "CSC",
     "Mechanical Engineering": "MER",
@@ -327,7 +327,7 @@ export default function AddCourseMappingModal({
                 <input
                   className="textbox faculty-input"
                   type="text"
-                  placeholder="Course Code (e.g., SER-210)"
+                  placeholder="Course Code"
                   value={courseCode}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     const value = e.target.value.toUpperCase();
@@ -346,7 +346,7 @@ export default function AddCourseMappingModal({
                 <input
                   className="textbox faculty-input"
                   type="text"
-                  placeholder="Course Title (e.g., Software Design and Architecture)"
+                  placeholder="Course Title"
                   value={courseTitle}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     setCourseTitle(e.target.value)
@@ -366,13 +366,13 @@ export default function AddCourseMappingModal({
                 )}
 
                 <div style={{ marginTop: "12px", fontWeight: 600 }}>
-                  (Optional) Skills & Competencies
+                  Skills & Competencies (Optional)
                 </div>
 
                 <AutofillSkillBox
                   value={courseSkills}
                   onChange={setCourseSkills}
-                  placeholder="Add Skills (e.g., React, SQL, Agile)"
+                  placeholder="Add Skills"
                 />
 
                 <div className="add-competency-checkbox-grid">
