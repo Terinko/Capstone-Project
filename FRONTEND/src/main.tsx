@@ -11,6 +11,7 @@ import UnmappedCourses from "./UnmappedCourses.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
+import HistoryPage from "./HistoryPage";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,6 +26,14 @@ createRoot(document.getElementById("root")!).render(
           element={
             <ProtectedRoute allowedTypes={["Student"]}>
               <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute allowedTypes={["Student"]}>
+              <HistoryPage />
             </ProtectedRoute>
           }
         />

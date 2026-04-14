@@ -11,6 +11,7 @@ import { forgotPasswordRouter } from "./Routers/ForgotPasswordRouter.js"; // ←
 import { autofillRouter } from "./Routers/AutofillRouter.js";
 import { facultyCoursesRouter } from "./Routers/FacultyCourseRouter.js";
 import AuditRouter from "./Routers/AuditRouter.js";
+import { historyRouter } from "./Routers/HistoryRouter.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -26,6 +27,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/auth", createAccountRouter);
 app.use("/api/auth", forgotPasswordRouter); // ← NEW: forgot-password, verify-code, reset-password
+app.use("/api/history", historyRouter);
 
 // Protected routes
 app.use("/api/auth", RequireAuth, authProfileRouter);

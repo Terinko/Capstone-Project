@@ -38,3 +38,55 @@
 .custom-toggle {
   border-color: #ffb718 !important;
 }
+
+@media (max-width: 991.98px) {
+  .app-navbar {
+    height: 86px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .navbar-brand {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+  }
+
+  .navbar-logo {
+    height: 5.5rem; /* bigger logo */
+    margin-top: 0; /* removes the downward push */
+  }
+
+  .custom-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -6px; /* brings hamburger up slightly */
+  }
+
+  .navbar-collapse {
+    width: 100%;
+    margin-top: 0.75rem;
+    background: #131d43;
+    border-radius: 12px;
+    padding: 0.5rem 0;
+  }
+
+  .navbar-nav {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .nav-item {
+    width: 100%;
+  }
+
+  .nav-btn {
+    width: 100%;
+    text-align: left;
+    padding: 0.85rem 1rem;
+  }
+}

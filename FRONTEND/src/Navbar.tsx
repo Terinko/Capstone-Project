@@ -8,6 +8,7 @@ import { loadSession, clearSession } from "./Session";
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [userType, setUserType] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,15 +19,22 @@ const Navbar: React.FC = () => {
   const handleProfileClick = () => {
     if (userType) {
       setShowEditModal(true);
+      setMenuOpen(false);
     } else {
       console.warn("No session found; cannot open EditAccountModal.");
     }
+  };
+
+  const handleHistoryClick = () => {
+    navigate("/history");
+    setMenuOpen(false);
   };
 
   // NEW: Make this function async so it can wait for the audit log to save
   const handleSignOut = async () => {
     await clearSession();
     setUserType(null);
+    setMenuOpen(false);
     navigate("/");
   };
 
@@ -44,22 +52,33 @@ const Navbar: React.FC = () => {
         <button
           className="navbar-toggler custom-toggle"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarContent"
+          onClick={() => setMenuOpen((prev) => !prev)}
           aria-controls="navbarContent"
-          aria-expanded="false"
+          aria-expanded={menuOpen}
           aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        <div className="collapse navbar-collapse" id="navbarContent">
+        <div
+          className={`navbar-collapse ${menuOpen ? "show" : ""}`}
+          id="navbarContent"
+        >
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
+            {userType === "Student" && (
+              <li className="nav-item">
+                <button className="nav-btn" onClick={handleHistoryClick}>
+                  History
+                </button>
+              </li>
+            )}
+
             <li className="nav-item">
               <button className="nav-btn" onClick={handleProfileClick}>
                 Profile
               </button>
             </li>
+
             <li className="nav-item">
               <button className="nav-btn" onClick={handleSignOut}>
                 Log Out

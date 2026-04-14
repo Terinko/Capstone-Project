@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../supabaseClient";
+import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
@@ -7,6 +8,7 @@ import Navbar from "./Navbar";
 const API_KEY = import.meta.env.VITE_AIAPIKEY;
 const OPENROUTER_URL = import.meta.env.VITE_OPEN_ROUTER_URL;
 const MODEL_ID = import.meta.env.VITE_MODEL_ID;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const getVal = (obj: any, key: string) => {
   if (!obj) return undefined;
@@ -64,6 +66,8 @@ const StudentDashboard: React.FC = () => {
   const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showToast, setShowToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
@@ -115,6 +119,13 @@ const StudentDashboard: React.FC = () => {
       return { ...course, offerings: filteredOfferings };
     });
   }, [majorClasses, major]);
+
+  const courseNameByCode = useMemo(() => {
+    return availableClasses.reduce<Record<string, string>>((acc, course) => {
+      acc[course.courseCode] = course.courseName;
+      return acc;
+    }, {});
+  }, [availableClasses]);
 
   // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
   useEffect(() => {
@@ -405,6 +416,120 @@ Strict Rule:
     URL.revokeObjectURL(url);
   };
 
+  const getLoggedInStudentId = (): number => {
+    const session = loadSession();
+
+    if (!session) {
+      throw new Error("No active session found.");
+    }
+
+    if (session.userType !== "Student") {
+      throw new Error("Only students can save talking points.");
+    }
+
+    const tokenParts = session.token.split(".");
+    if (tokenParts.length < 2) {
+      throw new Error("Invalid session token.");
+    }
+
+    const payload = JSON.parse(atob(tokenParts[1]));
+    const studentId = Number(payload.userId);
+
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      throw new Error("Invalid student id in session token.");
+    }
+
+    return studentId;
+  };
+
+  const parseTalkingPointsByCourse = (
+    lines: string[],
+  ): Record<string, string[]> => {
+    const grouped: Record<string, string[]> = {};
+    let currentCourseCode: string | null = null;
+
+    for (const rawLine of lines) {
+      const line = String(rawLine ?? "").trim();
+      if (!line) continue;
+
+      if (line.endsWith(":")) {
+        currentCourseCode = line.replace(/:$/, "").trim();
+        if (currentCourseCode && !grouped[currentCourseCode]) {
+          grouped[currentCourseCode] = [];
+        }
+        continue;
+      }
+
+      if (!currentCourseCode) continue;
+      grouped[currentCourseCode].push(line);
+    }
+
+    return grouped;
+  };
+
+  const handleSaveTalkingPoints = async () => {
+    if (generationMode !== "talkingPoints" || bullets.length === 0) return;
+
+    setIsSaving(true);
+    setErrorMsg(null);
+
+    try {
+      const studentId = getLoggedInStudentId();
+      const groupedTalkingPoints = parseTalkingPointsByCourse(bullets);
+
+      const entries = Object.entries(groupedTalkingPoints).filter(
+        ([, points]) => points.length > 0,
+      );
+
+      if (entries.length === 0) {
+        throw new Error("No talking points were found to save.");
+      }
+
+      for (const [courseCode, talkingPoints] of entries) {
+        const courseName = courseNameByCode[courseCode] ?? courseCode;
+
+        const response = await fetch(`${API_BASE_URL}/api/history`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            studentId,
+            courseCode,
+            courseName,
+            talkingPoints,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json().catch(() => null);
+          throw new Error(
+            errorResult?.error ||
+              `Failed to save talking points for ${courseCode}`,
+          );
+        }
+      }
+
+      setShowToast(true);
+
+      // auto hide after 3 seconds
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (error: any) {
+      console.error("Save talking points error:", error);
+      setErrorMsg(error.message || "Failed to save talking points.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveDisabled =
+    generationMode !== "talkingPoints" ||
+    bullets.length === 0 ||
+    isLoading ||
+    isSaving;
+
   return (
     <div className="dashboard-page">
       <Navbar />
@@ -435,11 +560,11 @@ Strict Rule:
                   setErrorMsg(null);
                 }}
               >
-                {
-                  MAJORS.map((major, index) => (
-                    <option key={index} value={major}>{ major }</option>
-                  ))
-                }
+                {MAJORS.map((major, index) => (
+                  <option key={index} value={major}>
+                    {major}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -632,7 +757,24 @@ Strict Rule:
                   : "Generated Talking Points:"}
               </h2>
 
-              <div className="bullets-button">
+              <div
+                className="bullets-button"
+                style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+              >
+                <button
+                  type="button"
+                  className="btn-export"
+                  onClick={handleSaveTalkingPoints}
+                  disabled={saveDisabled}
+                  aria-label="Save generated talking points"
+                  style={{
+                    opacity: saveDisabled ? 0.5 : 1,
+                    cursor: saveDisabled ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {isSaving ? "Saving..." : "Save"}
+                </button>
+
                 <button
                   type="button"
                   className="btn-export"
@@ -696,6 +838,10 @@ Strict Rule:
           </div>
         </section>
       </main>
+
+      {showToast && (
+        <div className="toast-success">Talking points saved successfully!</div>
+      )}
 
       <Footer />
     </div>
