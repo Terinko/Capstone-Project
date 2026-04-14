@@ -409,27 +409,18 @@ export default function EditCourseMappingModal({
                     >
                       Professor
                     </label>
-                    <input
-                      className="edit-modal-input"
-                      value={newProfessorName || "Unassigned"}
-                      disabled
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        color: "#94a3b8",
-                        cursor: "not-allowed",
-                      }}
-                    />
-                    {isAdmin && (
-                      <div className="edit-modal-card-actions">
-                        <button
-                          className="btn-primary"
-                          onClick={handleDeleteProfessor}
-                          disabled={newProfessorName.trim() === "" || newProfessorName.trim() === "N/A"}
-                        >
-                          Delete Professor
-                        </button>
-                      </div>
-                    )}
+                    <div className="edit-modal-input edit-modal-input-professor">
+                      <span>{newProfessorName || "Unassigned"}</span>
+                        {isAdmin && (
+                            <button
+                              className="icon-btn danger"
+                              onClick={handleDeleteProfessor}
+                              aria-label="Remove"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+                        )}
+                    </div>
                   </div>
                 </div>
               </div>

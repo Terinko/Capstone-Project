@@ -224,6 +224,12 @@
   cursor: pointer;
 }
 
+.edit-modal-input-professor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .edit-modal-bank-row:last-child,
 .edit-modal-item:last-child {
   border-bottom: none;
