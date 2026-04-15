@@ -4,11 +4,7 @@ import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
-
-const API_KEY = import.meta.env.VITE_AIAPIKEY;
-const OPENROUTER_URL = import.meta.env.VITE_OPEN_ROUTER_URL;
-const MODEL_ID = import.meta.env.VITE_MODEL_ID;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { apiClient } from "./services/apiClient";
 
 const getVal = (obj: any, key: string) => {
   if (!obj) return undefined;
@@ -37,8 +33,6 @@ const MAJORS: MajorOption[] = [
 
 type GenerationMode = "skills" | "talkingPoints";
 
-// One entry per unique Course_Code within a major.
-// offerings holds every DB row that shares that code (one per version).
 interface CourseOffering {
   id: string;
   altName: string | null;
@@ -83,11 +77,8 @@ const StudentDashboard: React.FC = () => {
   useEffect(() => {
     const fetchMajorClasses = async () => {
       try {
-        const response = await fetch(API_BASE_URL + "/courses");
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const result = await response.json();
+        const result =
+          await apiClient<Record<MajorOption, ClassOption[]>>("/courses");
         setMajorClasses(result);
       } catch (err) {
         console.error("Failed to load classes:", err);
@@ -247,51 +238,6 @@ const StudentDashboard: React.FC = () => {
     (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
   ).length;
 
-  const buildResumePrompt = (
-    classBlocks: string,
-  ) => `Act as a professional resume writer.
-I will provide skills and tasks learned, grouped by university course.
-Transform these into strong, action-oriented resume bullet points, grouped by course.
-
-${classBlocks}
-
-Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
-2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
-3. Consolidate related skills within the same course where appropriate.
-4. Do not include any markdown formatting.
-5. Return plain text only, with course headers followed by bullet points on new lines.
-`;
-
-  const buildTalkingPointsPrompt = (
-    classBlocks: string,
-  ) => `Act as a technical interview coach.
-
-I will provide skills and tasks learned, grouped by university course.
-Transform them into interview-ready talking points that a student can say out loud.
-
-${classBlocks}
-
-Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
-2. For each skill provided, generate EXACTLY ONE talking point.
-3. Do NOT combine skills together.
-4. Do NOT create multiple talking points for a single skill.
-5. Each talking point must be on its own new line and begin with a dash (-).
-6. Write each talking point in first-person language (e.g., "I built...", "I implemented...", "I worked with...").
-7. Each talking point should:
-   - Clearly explain what was done
-   - Reference tools, technologies, or concepts when possible
-   - Sound natural for an interview response
-8. Keep each talking point concise (1-2 sentences max).
-9. Do not include markdown formatting.
-10. Return plain text only.
-
-Strict Rule:
-- If a course has N skills listed, you must return exactly N talking points for that course.
-- Maintain a one-to-one mapping between input skills and output talking points.
-`;
-
   const generateWithAI = async (
     skillsByClass: Record<string, string[]>,
     mode: GenerationMode,
@@ -300,47 +246,24 @@ Strict Rule:
     setErrorMsg(null);
 
     try {
-      const classBlocks = Object.entries(skillsByClass)
-        .map(
-          ([courseCode, skills]) =>
-            `Course: ${courseCode}\n${skills.map((s) => `- ${s}`).join("\n")}`,
-        )
-        .join("\n\n");
-
-      const prompt =
-        mode === "skills"
-          ? buildResumePrompt(classBlocks)
-          : buildTalkingPointsPrompt(classBlocks);
-
       const payload = {
-        model: MODEL_ID,
-        messages: [{ role: "user", content: prompt }],
+        skillsByClass,
+        mode,
       };
 
-      const response = await fetch(OPENROUTER_URL, {
+      const result = await apiClient<{ text: string }>("/api/resume/generate", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Student Resume Dashboard",
-        },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-
-      const result = await response.json();
-      const text = result.choices?.[0]?.message?.content || "";
-
-      const formattedBullets = text
+      const formattedBullets = result.text
         .split("\n")
         .map((line: string) => line.replace(/^[*-]\s*/, "").trim())
         .filter((line: string) => line.length > 0);
 
       setBullets(formattedBullets);
     } catch (error: any) {
-      console.error("OpenRouter Error:", error);
+      console.error("AI Generation Error:", error);
       setErrorMsg(
         mode === "skills"
           ? "Failed to generate resume bullet points."
@@ -488,11 +411,8 @@ Strict Rule:
       for (const [courseCode, talkingPoints] of entries) {
         const courseName = courseNameByCode[courseCode] ?? courseCode;
 
-        const response = await fetch(`${API_BASE_URL}/api/history`, {
+        await apiClient("/api/history", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             studentId,
             courseCode,
@@ -500,19 +420,10 @@ Strict Rule:
             talkingPoints,
           }),
         });
-
-        if (!response.ok) {
-          const errorResult = await response.json().catch(() => null);
-          throw new Error(
-            errorResult?.error ||
-              `Failed to save talking points for ${courseCode}`,
-          );
-        }
       }
 
       setShowToast(true);
 
-      // auto hide after 3 seconds
       setTimeout(() => {
         setShowToast(false);
       }, 3000);
@@ -694,7 +605,6 @@ Strict Rule:
                   flexWrap: "wrap",
                 }}
               >
-                {/* NEW TOGGLE GOES HERE */}
                 <div className="generation-toggle-wrap">
                   <span
                     className={`toggle-label ${

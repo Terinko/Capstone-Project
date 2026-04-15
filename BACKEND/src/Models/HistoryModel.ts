@@ -21,18 +21,19 @@ function cleanTalkingPoints(values: unknown): string[] {
     .filter((value) => value.length > 0);
 }
 
-export async function saveTalkingPointsForStudent(input: {
-  studentId: number;
-  courseName: string;
-  courseCode: string;
-  talkingPoints: string[];
-}) {
-  const studentId = Number(input.studentId);
-  const courseName = String(input.courseName ?? "").trim();
-  const courseCode = String(input.courseCode ?? "")
+export async function saveTalkingPointsForStudent(
+  reqStudentId: number,
+  reqCourseCode: string,
+  reqCourseName: string,
+  reqTalkingPoints: string[],
+) {
+  // We renamed the incoming parameters above so we can safely declare our formatted variables here
+  const studentId = Number(reqStudentId);
+  const courseName = String(reqCourseName ?? "").trim();
+  const courseCode = String(reqCourseCode ?? "")
     .trim()
     .toUpperCase();
-  const talkingPoints = cleanTalkingPoints(input.talkingPoints);
+  const talkingPoints = cleanTalkingPoints(reqTalkingPoints);
 
   if (!Number.isInteger(studentId) || studentId <= 0) {
     throw new Error("Invalid studentId");
