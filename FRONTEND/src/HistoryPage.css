@@ -70,22 +70,30 @@
   line-height: 1.6;
 }
 
-.history-date-left {
+.history-date-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.history-date-text {
-  font-weight: 600;
+.history-date-button {
+  flex: 1;
+  background: #f3f3f5;
+  border: 2px solid #1b245f;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
   color: #1b245f;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: 0.2s ease;
 }
 
-.history-arrow-button {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+.history-date-button:hover {
+  background: #ececf1;
 }
 
 .icon-button.danger {

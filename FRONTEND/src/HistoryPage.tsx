@@ -231,35 +231,30 @@ const HistoryPage: React.FC = () => {
 
                   return (
                     <div key={group.dateKey} className="history-group">
-                      <div className="history-date-button">
-                        <div className="history-date-left">
-                          <span className="history-date-text">
-                            {group.displayDate}
-                          </span>
-
-                          <button
-                            type="button"
-                            className="icon-button danger"
-                            onClick={() =>
-                              handleDeleteDateGroup(group.dateKey, group.items)
-                            }
-                            disabled={deletingDateKey === group.dateKey}
-                            title="Delete"
-                          >
-                            <i className="bi bi-trash"></i>
-                          </button>
-                        </div>
-
+                      <div className="history-date-row">
                         <button
                           type="button"
-                          className="history-arrow-button"
+                          className="history-date-button"
                           onClick={() => toggleDate(group.dateKey)}
                         >
+                          <span>{group.displayDate}</span>
                           <span
                             className={`history-arrow ${isOpen ? "open" : ""}`}
                           >
                             ▼
                           </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="icon-button danger"
+                          onClick={() =>
+                            handleDeleteDateGroup(group.dateKey, group.items)
+                          }
+                          disabled={deletingDateKey === group.dateKey}
+                          title="Delete"
+                        >
+                          <i className="bi bi-trash"></i>
                         </button>
                       </div>
 
