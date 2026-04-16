@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./Navbar.css";
 import quLogo from "./assets/Qyellow_logo.png";
 import EditAccountModal from "./EditAccountModal";
@@ -9,7 +9,9 @@ const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [userType, setUserType] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
   const navigate = useNavigate();
+  const location = useLocation(); // Hook to get the current URL path
 
   useEffect(() => {
     const session = loadSession();
@@ -25,13 +27,21 @@ const Navbar: React.FC = () => {
     }
   };
 
-  const handleHistoryClick = () => {
-    navigate("/history");
-    setMenuOpen(false);
-  };
-
-  const handleAuditLogsClick = () => {
-    navigate("/audit-logs");
+  // Dynamic Navigation Handler
+  const handleToggleSubPage = (targetPath: string) => {
+    if (location.pathname === targetPath) {
+      // If we are already on the sub-page, route back to the correct dashboard
+      if (userType === "Student") {
+        navigate("/studentdashboard");
+      } else if (userType === "Administrator" || userType === "Admin") {
+        navigate("/adminDashboard");
+      } else {
+        navigate("/"); // Fallback
+      }
+    } else {
+      // Otherwise, go to the sub-page
+      navigate(targetPath);
+    }
     setMenuOpen(false);
   };
 
@@ -69,18 +79,28 @@ const Navbar: React.FC = () => {
           id="navbarContent"
         >
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
+            {/* Student Navigation Toggle */}
             {userType === "Student" && (
               <li className="nav-item">
-                <button className="nav-btn" onClick={handleHistoryClick}>
-                  History
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/history")}
+                >
+                  {location.pathname === "/history" ? "Dashboard" : "History"}
                 </button>
               </li>
             )}
 
-            {userType === "Administrator" && (
+            {/* Admin Navigation Toggle (checking both Admin and Administrator for DB safety) */}
+            {(userType === "Administrator" || userType === "Admin") && (
               <li className="nav-item">
-                <button className="nav-btn" onClick={handleAuditLogsClick}>
-                  Audit Logs
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/audit-logs")}
+                >
+                  {location.pathname === "/audit-logs"
+                    ? "Dashboard"
+                    : "Audit Logs"}
                 </button>
               </li>
             )}
