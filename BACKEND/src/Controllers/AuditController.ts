@@ -9,8 +9,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
     let query = supabase
       .from("AuditLogs")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .order("created_at", { ascending: false });
 
     // Apply Date Filters
     if (startDate && typeof startDate === "string") {
