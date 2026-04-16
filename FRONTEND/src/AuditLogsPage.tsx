@@ -217,6 +217,10 @@ const AuditLogsPage: React.FC = () => {
                 <div style={{ flex: 1 }}>
                   <Slider
                     range
+                    trackStyle={{ backgroundColor: '#418fde' }}
+                    handleStyle={{
+                      borderColor: '#418fde'
+                    }}
                     min={minDate}
                     max={maxDate}
                     value={sliderValue}
