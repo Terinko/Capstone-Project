@@ -61,7 +61,6 @@ router.post("/generate", async (req, res) => {
         .json({ error: "No skills provided for generation." });
     }
 
-    // 1. Format the data into the text blocks the AI expects
     const classBlocks = Object.entries(skillsByClass)
       .map(
         ([courseCode, skills]) =>
@@ -69,60 +68,88 @@ router.post("/generate", async (req, res) => {
       )
       .join("\n\n");
 
-    // 2. Select the correct prompt based on the user's mode toggle
     const prompt =
       mode === "skills"
         ? buildResumePrompt(classBlocks)
         : buildTalkingPointsPrompt(classBlocks);
 
-    // 3. Retrieve environment variables (Ensure these are set in BACKEND/.env)
-    // Note: It's best practice to rename VITE_AIAPIKEY to just AIAPIKEY in your backend .env
-    const API_KEY = process.env.VITE_AIAPIKEY || process.env.VITE_AIAPIKEY;
+    const API_KEY = process.env.VITE_AIAPIKEY;
     const OPENROUTER_URL = process.env.VITE_OPEN_ROUTER_URL;
-    const MODEL_ID = process.env.VITE_MODEL_ID; // Fallback to a default if env is missing
 
-    if (!API_KEY) {
-      throw new Error("Missing AI API Key in backend environment.");
+    if (!API_KEY || !OPENROUTER_URL) {
+      throw new Error("Missing OpenRouter credentials in backend environment.");
     }
 
-    if (!OPENROUTER_URL) {
-      throw new Error("Missing OpenRouter URL in backend environment.");
+    // 1. Define our cascade of models from the .env file
+    const fallbackModels = [
+      process.env.VITE_MODEL_ID_1,
+      process.env.VITE_MODEL_ID_2,
+      process.env.VITE_MODEL_ID_3,
+    ].filter(Boolean) as string[]; // filter(Boolean) removes any undefined ones
+
+    if (fallbackModels.length === 0) {
+      throw new Error("No models defined in environment variables.");
     }
 
-    const payload = {
-      model: MODEL_ID,
-      messages: [{ role: "user", content: prompt }],
-    };
+    let lastError: any = null;
 
-    // 4. Make the secure server-to-server call to OpenRouter
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-        // You can replace HTTP-Referer with your actual production URL later
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "Student Resume Dashboard",
-      },
-      body: JSON.stringify(payload),
-    });
+    // 2. Loop through the models. If one fails, try the next.
+    for (const currentModel of fallbackModels) {
+      try {
+        console.log(`Attempting generation with model: ${currentModel}`);
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error("OpenRouter Error Body:", errBody);
-      throw new Error(`HTTP error ${response.status} from OpenRouter`);
+        const payload = {
+          model: currentModel,
+          messages: [{ role: "user", content: prompt }],
+        };
+
+        const response = await fetch(OPENROUTER_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "Student Resume Dashboard",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        // If the API call itself fails (e.g., 502 Bad Gateway, 429 Rate Limit)
+        if (!response.ok) {
+          const errBody = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errBody}`);
+        }
+
+        const result = await response.json();
+        const text = result.choices?.[0]?.message?.content?.trim();
+
+        // Heuristic for a "bad response" - if it's empty or suspiciously short
+        if (!text || text.length < 10) {
+          throw new Error("Response was empty or invalid.");
+        }
+
+        // 3. SUCCESS! Send the response to the frontend and exit the function.
+        console.log(`Success with ${currentModel}`);
+        return res.status(200).json({ text });
+      } catch (err: any) {
+        // Log the failure, save the error, and let the loop continue to the next model
+        console.warn(`Model ${currentModel} failed:`, err.message);
+        lastError = err;
+      }
     }
 
-    const result = await response.json();
-    const text = result.choices?.[0]?.message?.content || "";
-
-    // 5. Send the generated text back to the React frontend
-    res.status(200).json({ text });
+    // 4. If the loop finishes without returning, it means ALL models failed.
+    console.error("All fallback models exhausted. Last error:", lastError);
+    return res
+      .status(500)
+      .json({
+        error: "Failed to generate AI content. Please try again later.",
+      });
   } catch (error: any) {
     console.error("Backend AI Generation Error:", error);
-    res
+    return res
       .status(500)
-      .json({ error: "Failed to generate AI content. Please try again." });
+      .json({ error: "An unexpected error occurred. Please try again." });
   }
 });
 
