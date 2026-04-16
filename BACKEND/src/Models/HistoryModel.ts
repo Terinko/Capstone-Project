@@ -163,3 +163,44 @@ export async function deleteHistoryEntryForStudent(
     deletedHistoryId: historyId,
   };
 }
+
+export async function deleteAllHistoryForStudent(studentId: number) {
+  if (!Number.isInteger(studentId) || studentId <= 0) {
+    throw new Error("Invalid studentId");
+  }
+
+  // 1) Find all history IDs linked to this student
+  const { data: links, error: fetchError } = await supabase
+    .from("Student_History")
+    .select("History_id")
+    .eq("Student_id", studentId);
+
+  if (fetchError) throw fetchError;
+
+  if (!links || links.length === 0) {
+    return { success: true, message: "No history found to clear." };
+  }
+
+  const historyIds = links.map((link) => link.History_id);
+
+  // 2) Delete the mappings for this student
+  const { error: mappingDeleteError } = await supabase
+    .from("Student_History")
+    .delete()
+    .eq("Student_id", studentId);
+
+  if (mappingDeleteError) throw mappingDeleteError;
+
+  // 3) Delete the actual history rows
+  const { error: historyDeleteError } = await supabase
+    .from("History")
+    .delete()
+    .in("id", historyIds);
+
+  if (historyDeleteError) throw historyDeleteError;
+
+  return {
+    success: true,
+    deletedCount: historyIds.length,
+  };
+}

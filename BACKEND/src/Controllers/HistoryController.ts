@@ -3,6 +3,7 @@ import {
   saveTalkingPointsForStudent,
   getHistoryForStudent,
   deleteHistoryEntryForStudent,
+  deleteAllHistoryForStudent,
 } from "../Models/HistoryModel.js";
 
 export const saveHistory = async (req: Request, res: Response) => {
@@ -73,6 +74,22 @@ export const deleteHistory = async (req: Request, res: Response) => {
     if (msg === "History entry not found for this student") {
       return res.status(404).json({ error: msg });
     }
+    res.status(500).json({ error: msg });
+  }
+};
+
+export const clearAllHistory = async (req: Request, res: Response) => {
+  try {
+    const studentId = Number(req.params.studentId);
+
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      return res.status(400).json({ error: "Invalid studentId" });
+    }
+
+    const result = await deleteAllHistoryForStudent(studentId);
+    res.json(result);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });
   }
 };

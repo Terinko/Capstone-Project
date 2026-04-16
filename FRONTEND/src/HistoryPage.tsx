@@ -131,7 +131,7 @@ const HistoryPage: React.FC = () => {
 
       for (const item of items) {
         const response = await fetch(
-          `${API_BASE_URL}/api/history/student/${studentId}/${item.id}`,
+          `${API_BASE_URL}/api/history/student/${studentId}/entry/${item.id}`,
           {
             method: "DELETE",
           },
