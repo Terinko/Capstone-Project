@@ -28,7 +28,6 @@ if (!API_BASE) {
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = loadSession();
-  console.log("userType:", session?.userType);
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
