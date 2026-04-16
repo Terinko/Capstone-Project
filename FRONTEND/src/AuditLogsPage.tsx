@@ -146,9 +146,6 @@ const AuditLogsPage: React.FC = () => {
       <div className="admin-content">
         <section className="admin-header">
           <h1 className="admin-title">Audit Logs</h1>
-          <p className="admin-subtitle">
-            Track system events and user actions.
-          </p>
         </section>
 
         <section
