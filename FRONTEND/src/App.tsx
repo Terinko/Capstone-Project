@@ -75,7 +75,6 @@ const App: React.FC = () => {
       <LoginModal
         showModal={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        onForgotPassword={() => setShowForgotPasswordModal(true)}
       />
 
       <CreateAccountModal

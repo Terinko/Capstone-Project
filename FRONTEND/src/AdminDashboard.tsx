@@ -4,7 +4,6 @@ import Navbar from "./Navbar";
 import "./AdminDashboard.css";
 import EditCourseMappingModal from "./EditCourseMappingModal";
 import { loadSession, clearSession } from "./Session";
-import AuditLogs from "./components/auditLogs.tsx";
 
 type CompletionStatus = "Mapped" | "Unmapped";
 type CompletionFilter = "All" | "Mapped" | "Unmapped";
@@ -29,19 +28,18 @@ if (!API_BASE) {
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = loadSession();
+  console.log("userType:", session?.userType);
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      // Send JWT instead of raw user-id/user-type headers
       ...(session && { Authorization: `Bearer ${session.token}` }),
       ...(init?.headers ?? {}),
     },
   });
 
   if (res.status === 401) {
-    // Token expired or invalid — force logout
     clearSession();
     window.location.href = "/";
     throw new Error("Session expired, please log in again");
@@ -63,7 +61,6 @@ const AdminDashboard: React.FC = () => {
   const [completionFilter, setCompletionFilter] =
     useState<CompletionFilter>("All");
 
-  // DYNAMIC: Stores majors fetched from the DB
   const [availableMajors, setAvailableMajors] = useState<string[]>([]);
 
   /* ------------------------------ Table state ------------------------------ */
@@ -76,21 +73,14 @@ const AdminDashboard: React.FC = () => {
   );
   const [refreshKey, setRefreshKey] = useState(0);
 
-  /**
-   * 1. FETCH MAJORS ON LOAD
-   * Queries the backend to see what Majors actually exist in the DB.
-   */
   useEffect(() => {
     const fetchMajors = async () => {
       try {
-        // We use the public /courses endpoint which groups courses by Major
         const data = await apiFetch<Record<string, unknown>>("/courses");
         const dynamicMajors = Object.keys(data);
 
         if (dynamicMajors.length > 0) {
           setAvailableMajors(dynamicMajors);
-
-          // If the default filter isn't in the list, switch to the first available one
           if (!dynamicMajors.includes(majorFilter)) {
             setMajorFilter(dynamicMajors[0]);
           }
@@ -103,9 +93,6 @@ const AdminDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * 2. FETCH ROWS WHEN FILTERS CHANGE
-   */
   useEffect(() => {
     let cancelled = false;
 
@@ -151,7 +138,6 @@ const AdminDashboard: React.FC = () => {
         <section className="admin-header">
           <h1 className="admin-title">Admin Dashboard</h1>
           <p className="admin-subtitle">Everything you need, in one place.</p>
-          <AuditLogs />
         </section>
 
         <section className="admin-filter-bar">
@@ -164,8 +150,6 @@ const AdminDashboard: React.FC = () => {
               <label className="filter-label" htmlFor="major-select">
                 Select Major:
               </label>
-
-              {/* DYNAMIC SELECT: No hardcoded options here */}
               <select
                 id="major-select"
                 className="filter-select"
@@ -215,7 +199,7 @@ const AdminDashboard: React.FC = () => {
         {error && (
           <section className="admin-table-card">
             <div style={{ padding: 16 }}>
-              <div style={{ marginBottom: 8 }}>Couldn’t load courses.</div>
+              <div style={{ marginBottom: 8 }}>Couldn't load courses.</div>
               <div className="muted">{error}</div>
             </div>
           </section>
@@ -237,7 +221,6 @@ const AdminDashboard: React.FC = () => {
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
                     <div className="course-code">{row.course}</div>
-
                     {(row.altName || row.courseName) && (
                       <div className="course-name">
                         {row.altName || row.courseName}

@@ -4,7 +4,7 @@ import { supabase } from "../Database/supabaseClient.js";
 // GET /api/audit-logs
 export const getAuditLogs = async (req: Request, res: Response) => {
   try {
-    const { startDate } = req.query;
+    const { startDate, endDate, role } = req.query;
 
     let query = supabase
       .from("AuditLogs")
@@ -12,8 +12,18 @@ export const getAuditLogs = async (req: Request, res: Response) => {
       .order("created_at", { ascending: false })
       .limit(100);
 
+    // Apply Date Filters
     if (startDate && typeof startDate === "string") {
       query = query.gte("created_at", startDate);
+    }
+    if (endDate && typeof endDate === "string") {
+      // Append time to include the entire end day
+      query = query.lte("created_at", `${endDate}T23:59:59.999Z`);
+    }
+
+    // Apply Role Filter
+    if (role && typeof role === "string" && role !== "All") {
+      query = query.eq("user_type", role);
     }
 
     const { data, error } = await query;
@@ -33,15 +43,22 @@ export const getAuditLogs = async (req: Request, res: Response) => {
 // GET /api/audit-logs/export
 export const exportAuditLogs = async (req: Request, res: Response) => {
   try {
-    const { startDate } = req.query;
+    const { startDate, endDate, role } = req.query;
 
     let query = supabase
       .from("AuditLogs")
       .select("*")
       .order("created_at", { ascending: false });
 
+    // Apply same filters to export
     if (startDate && typeof startDate === "string") {
       query = query.gte("created_at", startDate);
+    }
+    if (endDate && typeof endDate === "string") {
+      query = query.lte("created_at", `${endDate}T23:59:59.999Z`);
+    }
+    if (role && typeof role === "string" && role !== "All") {
+      query = query.eq("user_type", role);
     }
 
     const { data, error } = await query;

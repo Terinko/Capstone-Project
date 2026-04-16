@@ -12,6 +12,7 @@ import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import HistoryPage from "./HistoryPage";
+import AuditLogsPage from "./AuditLogsPage";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -67,6 +68,8 @@ createRoot(document.getElementById("root")!).render(
             </ProtectedRoute>
           }
         />
+
+        <Route path="/audit-logs" element={<AuditLogsPage />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

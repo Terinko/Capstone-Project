@@ -24,6 +24,7 @@
     "express": "^5.2.1",
     "exprss": "^0.0.1-security",
     "lodash": "^4.17.21",
+    "rc-slider": "^11.1.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.1",

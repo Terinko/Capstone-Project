@@ -30,7 +30,11 @@ const Navbar: React.FC = () => {
     setMenuOpen(false);
   };
 
-  // NEW: Make this function async so it can wait for the audit log to save
+  const handleAuditLogsClick = () => {
+    navigate("/audit-logs");
+    setMenuOpen(false);
+  };
+
   const handleSignOut = async () => {
     await clearSession();
     setUserType(null);
@@ -69,6 +73,14 @@ const Navbar: React.FC = () => {
               <li className="nav-item">
                 <button className="nav-btn" onClick={handleHistoryClick}>
                   History
+                </button>
+              </li>
+            )}
+
+            {userType === "Administrator" && (
+              <li className="nav-item">
+                <button className="nav-btn" onClick={handleAuditLogsClick}>
+                  Audit Logs
                 </button>
               </li>
             )}
