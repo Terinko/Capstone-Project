@@ -25,6 +25,8 @@ import {
 import { findMajorByName } from "../Models/MajorModel.js";
 import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
 
+export { resolveOrCreateSkill } from "./AdminCourseController.js";
+
 // --- Helper Function ---
 function getFacultyId(req: Request): number {
   const user = (req as any).user;

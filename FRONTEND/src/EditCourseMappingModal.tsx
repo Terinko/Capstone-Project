@@ -273,13 +273,16 @@ export default function EditCourseMappingModal({
           }
 
           try {
-            const created = await apiFetch<Option>("/api/admin/skills", {
-              method: "POST",
-              body: JSON.stringify({
-                name,
-                major,
-              }),
-            });
+            const created = await apiFetch<Option>(
+              `${mappingBasePath}/skills/resolve`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  name,
+                  major,
+                }),
+              },
+            );
             newSkillIds.push(created.Skill_Id);
           } catch (e: any) {
             // If backend returns "already exists", reuse that Skill_Id
@@ -304,18 +307,18 @@ export default function EditCourseMappingModal({
       );
 
       // 2) Update the mapping
-        await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
-          method: "PUT",
-          body: JSON.stringify({
-            skillIds: mergedSkillIds,
-            competencyIds: selectedCompetencyIds,
-          }),
-        });
+      await apiFetch(`${mappingBasePath}/courses/${courseId}/mapping`, {
+        method: "PUT",
+        body: JSON.stringify({
+          skillIds: mergedSkillIds,
+          competencyIds: selectedCompetencyIds,
+        }),
+      });
       if (isAdmin) {
         await apiFetch(`${mappingBasePath}/courses/${courseId}`, {
           method: "PUT",
           body: JSON.stringify({
-            professor: newProfessorName
+            professor: newProfessorName,
           }),
         });
       }
@@ -411,15 +414,15 @@ export default function EditCourseMappingModal({
                     </label>
                     <div className="edit-modal-input edit-modal-input-professor">
                       <span>{newProfessorName || "Unassigned"}</span>
-                        {isAdmin && (
-                            <button
-                              className="icon-btn danger"
-                              onClick={handleDeleteProfessor}
-                              aria-label="Remove"
-                            >
-                              <FiTrash2 size={16} />
-                            </button>
-                        )}
+                      {isAdmin && (
+                        <button
+                          className="icon-btn danger"
+                          onClick={handleDeleteProfessor}
+                          aria-label="Remove"
+                        >
+                          <FiTrash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

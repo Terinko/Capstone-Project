@@ -8,6 +8,7 @@ import {
   getSkillsOptions,
   checkCourseCode,
   createNewCourse,
+  resolveOrCreateSkill,
 } from "../Controllers/FacultyCourseController.js";
 
 export const facultyCoursesRouter = Router();
@@ -25,3 +26,4 @@ facultyCoursesRouter.get("/courses/check-code", checkCourseCode);
 facultyCoursesRouter.post("/courses", createNewCourse);
 facultyCoursesRouter.put("/courses/:courseId/mapping", updateCourseMapping);
 facultyCoursesRouter.put("/courses/:courseId/claim", claimCourse);
+facultyCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);

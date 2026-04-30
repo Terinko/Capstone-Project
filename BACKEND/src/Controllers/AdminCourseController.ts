@@ -12,8 +12,7 @@ import {
 } from "../Models/CourseSkillMappingModel.js";
 import {
   getAllSkillsAndCompetencies,
-  createSkillWithName,
-  findSkillByName,
+  findOrCreateSkillByName,
 } from "../Models/SkillsModel.js";
 import { findMajorByName } from "../Models/MajorModel.js";
 import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
@@ -166,6 +165,27 @@ export const updateAdminCourseDetails = async (
       );
 
     res.json({ updated, syncedCount: syncedCourses.length });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    res.status(500).json({ error: msg });
+  }
+};
+
+type ResolveSkillBody = { name: string };
+
+// POST /api/admin/skills/resolve
+export const resolveOrCreateSkill = async (
+  req: Request<Record<string, never>, unknown, ResolveSkillBody>,
+  res: Response,
+) => {
+  try {
+    const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    if (!name) {
+      return res.status(400).json({ error: "Skill name is required" });
+    }
+
+    const skill = await findOrCreateSkillByName(name);
+    res.json(skill); // returns { Skill_Id, Skill_name, Type }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });
