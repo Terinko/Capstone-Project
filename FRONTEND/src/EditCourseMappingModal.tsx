@@ -49,6 +49,12 @@ type Props = {
   isAdmin: boolean;
 };
 
+type Professor = {
+  Faculty_Id: number;
+  FirstName: string;
+  LastName: string;
+}
+
 export default function EditCourseMappingModal({
   isOpen,
   courseId,
@@ -66,6 +72,10 @@ export default function EditCourseMappingModal({
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [professorFilter, setProfessorFilter] = useState<string>(
+    "N/A",
+  );
+  const [availableProfessors, setAvailableProfessors] = useState<Professor[]>([]);
 
   /* -------------------- Data state -------------------- */
   const [options, setOptions] = useState<SkillsOptionsResponse | null>(null);
@@ -138,6 +148,20 @@ export default function EditCourseMappingModal({
       cancelled = true;
     };
   }, [isOpen, courseId, major, apiFetch]);
+
+  useEffect(() => {
+    const fetchMajors = async () => {
+      try {
+        const data = await apiFetch<Record<string, Professor>>("/api/admin/faculty");
+        const professors = Object.values(data);
+        setAvailableProfessors(professors);
+      } catch (e) {
+        console.error("Failed to load majors list:", e);
+      }
+    };
+    fetchMajors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Resolve selected skill IDs into displayable text.
@@ -414,6 +438,22 @@ export default function EditCourseMappingModal({
                     </label>
                     <div className="edit-modal-input edit-modal-input-professor">
                       <span>{newProfessorName || "Unassigned"}</span>
+                      <select
+                        id="professor-select"
+                        className="filter-select"
+                        value={newProfessorName}
+                        onChange={(e) => setNewProfessorName(e.target.value)}
+                      >
+                        {availableProfessors.length > 0 ? (
+                          availableProfessors.map((m) => (
+                            <option key={m.Faculty_Id} value={`${m.FirstName} ${m.LastName}`}>
+                              {m.FirstName} {m.LastName}
+                            </option>
+                          ))
+                        ) : (
+                          <option>Loading...</option>
+                        )}
+                      </select>
                       {isAdmin && (
                         <button
                           className="icon-btn danger"

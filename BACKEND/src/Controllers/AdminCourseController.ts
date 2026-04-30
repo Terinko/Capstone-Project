@@ -16,6 +16,7 @@ import {
 } from "../Models/SkillsModel.js";
 import { findMajorByName } from "../Models/MajorModel.js";
 import { linkSkillToMajor } from "../Models/SkillMajorMappingModel.js";
+import { supabase } from "../Database/supabaseClient.js";
 
 // GET /api/admin/courses
 export const getAdminCourses = async (req: Request, res: Response) => {
@@ -190,4 +191,20 @@ export const resolveOrCreateSkill = async (
     const msg = e instanceof Error ? e.message : "Unknown error";
     res.status(500).json({ error: msg });
   }
+};
+
+// GET /api/admin/faculty
+export const getAdminFaculty = async (
+  req: Request<Record<string, never>, unknown, ResolveSkillBody>,
+  res: Response,
+) => {
+    const { data: existing } = await supabase
+      .from("Faculty_Admin")
+      .select("Faculty_Id, FirstName, LastName")
+      .eq("Type", false)
+    if (existing) {
+      res.status(200).json(existing);
+    } else {
+      res.status(500).json({ error: 'TEST' });
+    }
 };
