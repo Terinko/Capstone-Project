@@ -20,9 +20,9 @@ export const getAuditLogs = async (req: Request, res: Response) => {
       query = query.lte("created_at", `${endDate}T23:59:59.999Z`);
     }
 
-    // Apply Role Filter
+    // Apply Role Filter - Convert to uppercase to match DB values (ADMIN, FACULTY, STUDENT)
     if (role && typeof role === "string" && role !== "All") {
-      query = query.eq("user_type", role);
+      query = query.eq("user_type", role.toUpperCase());
     }
 
     const { data, error } = await query;
@@ -56,8 +56,10 @@ export const exportAuditLogs = async (req: Request, res: Response) => {
     if (endDate && typeof endDate === "string") {
       query = query.lte("created_at", `${endDate}T23:59:59.999Z`);
     }
+    
+    // Apply Role Filter - Convert to uppercase to match DB values
     if (role && typeof role === "string" && role !== "All") {
-      query = query.eq("user_type", role);
+      query = query.eq("user_type", role.toUpperCase());
     }
 
     const { data, error } = await query;

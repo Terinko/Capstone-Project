@@ -198,11 +198,16 @@ function generateCode(): string {
 
 async function sendResetEmail(toEmail: string, code: string): Promise<void> {
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 
   await transporter.sendMail({
@@ -257,6 +262,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       message: "If that email matches an account, a reset code was sent.",
     });
   } catch (error: any) {
+    console.error("Forgot Password Error:", error);
     res
       .status(500)
       .json({ error: "Failed to process forgot password request." });
