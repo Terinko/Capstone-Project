@@ -13,7 +13,6 @@ import {
   getFacultyName,
   getVisibleCoursesForFaculty,
   getUnassignedCourses,
-  assignCourseToFaculty,
 } from "../Models/FacultyCoursesModel.js";
 import {
   getCourseById,
@@ -393,8 +392,6 @@ export const createNewCourse = async (
       professor: facultyFullName,
       ...(alternateCourseTitle ? { courseNameAlt: alternateCourseTitle } : {}),
     });
-
-    await assignCourseToFaculty(facultyId, Number(newCourse.Course_Id));
 
     if (allMappingIds.length > 0) {
       await replaceCourseMappings(Number(newCourse.Course_Id), allMappingIds);
