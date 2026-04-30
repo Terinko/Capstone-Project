@@ -437,10 +437,10 @@ export default function EditCourseMappingModal({
                       Professor
                     </label>
                     <div className="edit-modal-input edit-modal-input-professor">
-                      <span>{newProfessorName || "Unassigned"}</span>
+                      {isAdmin ? (
                       <select
                         id="professor-select"
-                        className="filter-select"
+                        className="professor-dropdown"
                         value={newProfessorName}
                         onChange={(e) => setNewProfessorName(e.target.value)}
                       >
@@ -454,6 +454,9 @@ export default function EditCourseMappingModal({
                           <option>Loading...</option>
                         )}
                       </select>
+                      ) : (
+                        <span>{newProfessorName || "Unassigned"}</span>
+                      )}
                       {isAdmin && (
                         <button
                           className="icon-btn danger"

@@ -332,3 +332,10 @@
   background: rgba(220, 38, 38, 0.08);
   transform: scale(1.05);
 }
+
+.professor-dropdown {
+  background: transparent;
+  border: 0;
+  color: black;
+  width: max-content;
+}
