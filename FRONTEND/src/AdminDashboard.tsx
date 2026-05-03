@@ -133,6 +133,7 @@ const AdminDashboard: React.FC = () => {
     <div className="admin-dashboard">
       <Navbar />
 
+      { /* Admin Dashboard */ }
       <div className="admin-content">
         <section className="admin-header">
           <h1 className="admin-title">Admin Dashboard</h1>
@@ -187,6 +188,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </section>
 
+        { /* Loading */ }
         {loading && (
           <section className="admin-table-card">
             <div className="muted" style={{ padding: 16 }}>
@@ -195,6 +197,7 @@ const AdminDashboard: React.FC = () => {
           </section>
         )}
 
+        { /* Error */ }
         {error && (
           <section className="admin-table-card">
             <div style={{ padding: 16 }}>
@@ -204,6 +207,7 @@ const AdminDashboard: React.FC = () => {
           </section>
         )}
 
+        { /* All Courses */ }
         {!loading && !error && (
           <section className="admin-table-card">
             <div className="admin-table">

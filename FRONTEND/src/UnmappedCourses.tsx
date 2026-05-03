@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import "./UnmappedCourses.css";
 import Footer from "./footer";
 import Navbar from "./Navbar";

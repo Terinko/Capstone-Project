@@ -28,6 +28,7 @@ const HistoryPage: React.FC = () => {
   const [deletingDateKey, setDeletingDateKey] = useState<string | null>(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
 
+  // Check if student is authenticated
   const getLoggedInStudentId = (): number => {
     const session = loadSession();
 
@@ -54,12 +55,14 @@ const HistoryPage: React.FC = () => {
     return studentId;
   };
 
+  // Fetch saved course talking points
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         setLoading(true);
         setErrorMsg(null);
 
+        // Check if student is authenticated
         const studentId = getLoggedInStudentId();
 
         const response = await fetch(
@@ -113,6 +116,7 @@ const HistoryPage: React.FC = () => {
     setExpandedDate((prev) => (prev === dateKey ? null : dateKey));
   };
 
+  // Delete specific history
   const handleDeleteDateGroup = async (
     dateKey: string,
     items: HistoryItem[],
@@ -127,6 +131,7 @@ const HistoryPage: React.FC = () => {
       setDeletingDateKey(dateKey);
       setErrorMsg(null);
 
+        // Check if student is authenticated
       const studentId = getLoggedInStudentId();
 
       for (const item of items) {
@@ -156,6 +161,7 @@ const HistoryPage: React.FC = () => {
     }
   };
 
+  // Clear all history
   const handleClearAllHistory = async () => {
     const confirmed = window.confirm("Delete all saved history entries?");
 
@@ -226,6 +232,7 @@ const HistoryPage: React.FC = () => {
               </p>
             ) : (
               <div className="history-list">
+                { /* Your course history table */ }
                 {history.map((group) => {
                   const isOpen = expandedDate === group.dateKey;
 
@@ -245,6 +252,7 @@ const HistoryPage: React.FC = () => {
                           </span>
                         </button>
 
+                        { /* Delete button */ }
                         <button
                           type="button"
                           className="icon-button danger"

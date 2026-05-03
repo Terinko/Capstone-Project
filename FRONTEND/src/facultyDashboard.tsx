@@ -468,7 +468,7 @@ const FacultyDashboard: React.FC = () => {
           </section>
         )}
 
-        {/* Table */}
+        {/* Table of courses assigned to you */}
         {!loading && !error && (
           <section className="admin-table-card">
             <div className="admin-table">
@@ -481,6 +481,7 @@ const FacultyDashboard: React.FC = () => {
                 </div>
               </div>
 
+              { /* All assigned courses */ }
               {filteredRows.map((row) => (
                 <div className="admin-table-row" key={row.id}>
                   <div className="admin-cell admin-cell-course">
@@ -585,7 +586,7 @@ const FacultyDashboard: React.FC = () => {
           </section>
         )}
 
-        {/* Unassigned Courses */}
+        {/* Unassigned Courses section */}
         {!loading && !error && (
           <section className="admin-table-card" style={{ marginTop: 24 }}>
             <button
@@ -613,6 +614,7 @@ const FacultyDashboard: React.FC = () => {
                   : "#ffffff")
               }
             >
+              { /* Title of table */ }
               <span
                 style={{
                   fontWeight: 600,
@@ -662,6 +664,7 @@ const FacultyDashboard: React.FC = () => {
               </div>
             </button>
 
+            { /* Table of all unassigned courses */ }
             {unassignedOpen && (
               <div className="admin-table">
                 <div className="admin-table-row admin-table-header">
@@ -693,6 +696,7 @@ const FacultyDashboard: React.FC = () => {
                         </div>
                       )}
                     </div>
+                    { /* Claim course button */ }
                     <div className="admin-cell admin-cell-professor">
                       <button
                         type="button"
@@ -726,6 +730,7 @@ const FacultyDashboard: React.FC = () => {
                         I Teach This Course
                       </button>
                     </div>
+                    { /* Course Skills */ }
                     <div className="admin-cell admin-cell-skills">
                       {row.skills.length > 0 ? (
                         <ul>
@@ -737,6 +742,7 @@ const FacultyDashboard: React.FC = () => {
                         <span className="muted">No skills mapped yet</span>
                       )}
                     </div>
+                    { /* Course Competencies */ }
                     <div className="admin-cell admin-cell-competencies">
                       <div className="competency-content">
                         {row.competencies.length > 0 ? (
@@ -755,6 +761,7 @@ const FacultyDashboard: React.FC = () => {
                   </div>
                 ))}
 
+                { /* Status message for undefined courses */ }
                 {filteredUnassignedRows.length === 0 && (
                   <div className="admin-table-row admin-empty-row">
                     <div className="admin-cell" style={{ gridColumn: "1 / 5" }}>

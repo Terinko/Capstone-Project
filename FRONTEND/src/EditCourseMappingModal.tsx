@@ -420,6 +420,7 @@ export default function EditCourseMappingModal({
                   </div>
                 </div>
 
+                { /* Course Details */ }
                 <div className="edit-modal-card details-card">
                   <div className="edit-modal-card-title">Course Details</div>
 
@@ -436,6 +437,7 @@ export default function EditCourseMappingModal({
                     >
                       Professor
                     </label>
+                    { /* Professor Dropdown */ }
                     <div className="edit-modal-input edit-modal-input-professor">
                       {isAdmin ? (
                       <select

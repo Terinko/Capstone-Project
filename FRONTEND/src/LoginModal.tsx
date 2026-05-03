@@ -27,6 +27,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
     formState: { errors },
   } = useForm<ILoginInput>();
 
+  // Login functionalityy
   const onSubmit: SubmitHandler<ILoginInput> = async (data) => {
     setServerError("");
     setLoading(true);
@@ -53,6 +54,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
       saveSession(session);
       handleClose();
 
+      // Determines what the user is to navigate to specific page
       if (session.userType === "Administrator") navigate("/adminDashboard");
       else if (session.userType === "Student") navigate("/studentdashboard");
       else navigate("/facultyAdmin");
@@ -99,6 +101,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
             </div>
             <div className="modal-body">
               <form onSubmit={handleSubmit(onSubmit)}>
+                { /* Email field */ }
                 <div className="mb-3">
                   <div className="input-group">
                     <input
@@ -118,6 +121,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
                   </div>
                 </div>
 
+                { /* Password field */ }
                 <div className="mb-3">
                   <input
                     type="password"
@@ -140,6 +144,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ showModal, onClose }) => {
                   </div>
                 )}
 
+                { /* Forgot Password Link */ }
                 <a href="#" onClick={handleForgotPassword}>
                   Forgot Password
                 </a>

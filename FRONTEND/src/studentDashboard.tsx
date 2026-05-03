@@ -88,6 +88,7 @@ const StudentDashboard: React.FC = () => {
     fetchMajorClasses();
   }, []);
 
+  // Return Available classes
   const availableClasses = useMemo(() => {
     const baseClasses =
       majorClasses && majorClasses[major] ? majorClasses[major] : [];
@@ -339,6 +340,7 @@ const StudentDashboard: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Check if user can save talking points. (Authenticates if they are a student)
   const getLoggedInStudentId = (): number => {
     const session = loadSession();
 
@@ -390,6 +392,7 @@ const StudentDashboard: React.FC = () => {
     return grouped;
   };
 
+  // Logic to save talking points to clipboard
   const handleSaveTalkingPoints = async () => {
     if (generationMode !== "talkingPoints" || bullets.length === 0) return;
 
@@ -453,6 +456,7 @@ const StudentDashboard: React.FC = () => {
           </p>
         </section>
 
+        { /* Student schedule */ }
         <section className="card-section">
           <div className="card-surface">
             <h2 className="card-title">Build Your Schedule</h2>
@@ -586,6 +590,7 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
 
+            { /* Options for generating talking points or skills */ }
             <div
               className="generate-row"
               style={{
@@ -658,6 +663,7 @@ const StudentDashboard: React.FC = () => {
           </div>
         </section>
 
+        { /* Generated bullet points/talking points section */ }
         <section className="card-section">
           <div className="card-surface bullets-card">
             <div className="bullets-header">
@@ -707,6 +713,7 @@ const StudentDashboard: React.FC = () => {
               </div>
             </div>
 
+            { /* AI Generated bullet points/talking points */ }
             <div className="bullets-body">
               {isLoading ? (
                 <div className="loading-container">
@@ -749,6 +756,7 @@ const StudentDashboard: React.FC = () => {
         </section>
       </main>
 
+      { /* Status message for saving talking points */ }
       {showToast && (
         <div className="toast-success">Talking points saved successfully!</div>
       )}
