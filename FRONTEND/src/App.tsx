@@ -38,15 +38,14 @@ const App: React.FC = () => {
           alt="Quinnipiac Bobcats logo"
           className="hero-logo img-fluid"
         />
+        <h1 className="display-4 fw-bold mb-3 text-color-primary">
+          Quinnipiac Resume Builder
+        </h1>
       </header>
 
       <main className="flex-grow-1">
         <section className="container-fluid py-5 main-section-center">
           <div className="content-wrapper text-center">
-            <h1 className="display-4 fw-bold mb-3 text-color-primary">
-              Welcome to the Quinnipiac Resume Builder
-            </h1>
-
             <h2 className="h4 fw-semibold mb-2 text-color-primary">
               Add High Quality Talking Points To Your Resume
             </h2>

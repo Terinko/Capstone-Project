@@ -7,6 +7,12 @@
   text-align: center;
 }
 
+header {
+  height: 1130px;
+  flex-direction: column;
+  gap: 50px;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
