@@ -189,3 +189,139 @@
 .admin-empty-row .admin-cell {
   text-align: center;
 }
+
+/* --- Adjust layout for smaller screens (Mobile Optimization) --- */
+@media (max-width: 768px) {
+  /* Core container */
+  .admin-content {
+    padding: 1rem;
+  }
+
+  /* Filter bar structure */
+  .admin-filter-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-left {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .filter-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .filter-inline label {
+    margin-bottom: 0.25rem;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-height: 48px; /* Touch friendly */
+    box-sizing: border-box;
+    margin-left: 0 !important;
+  }
+
+  /* * MOBILE TABLE -> CARD CONVERSION * */
+  .admin-table {
+    display: block;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .admin-table-header {
+    display: none !important; /* Hide column headers completely */
+  }
+
+  .admin-table-row {
+    display: flex !important;
+    flex-direction: column;
+    background: #ffffff;
+    border: 2px solid #131d43; /* Maintain the blue border from desktop on cards */
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    padding: 1.25rem;
+    gap: 1rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .admin-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0; /* Override desktop padding */
+    border-right: none; /* Override desktop border */
+  }
+
+  /* Fix padding inside list items so they don't indent too far */
+  .admin-cell ul {
+    padding-left: 1.25rem;
+    margin: 0;
+  }
+
+  /* Inject headers using pseudo-elements so users know what the data is */
+  .admin-cell-professor::before {
+    content: "Professor";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .admin-cell-skills::before {
+    content: "Skills";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .admin-cell-competencies::before {
+    content: "Competencies";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  /* Style the course title row to act as the "Header" of the card */
+  .admin-cell-course {
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .course-code {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* Keep the edit button nicely aligned on the right */
+  .competency-content {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .edit-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+    background: #f8fafc;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

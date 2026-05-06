@@ -7,6 +7,7 @@ import { loadSession } from "./Session";
 import { apiClient } from "./services/apiClient";
 import Slider from "rc-slider";
 import "rc-slider/assets/index.css";
+import "./AuditLogsPage.css"; // Added import for our new CSS
 
 interface AuditLog {
   id: number;
@@ -148,40 +149,15 @@ const AuditLogsPage: React.FC = () => {
           <h1 className="admin-title">Audit Logs</h1>
         </section>
 
-        <section
-          className="admin-filter-bar"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "20px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "32px",
-              flexWrap: "wrap",
-              flex: 1,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span
-                className="filter-icon"
-                aria-hidden="true"
-                style={{ marginRight: "4px" }}
-              >
+        <section className="admin-filter-bar audit-filter-bar">
+          <div className="audit-filter-controls">
+            <div className="audit-role-wrapper">
+              <span className="filter-icon" aria-hidden="true">
                 <i className="bi bi-funnel"></i>
               </span>
 
-              <div className="filter-inline" style={{ margin: 0 }}>
-                <label
-                  className="filter-label"
-                  htmlFor="roleFilter"
-                  style={{ marginRight: "8px" }}
-                >
+              <div className="filter-inline">
+                <label className="filter-label" htmlFor="roleFilter">
                   User Role:
                 </label>
                 <select
@@ -199,28 +175,13 @@ const AuditLogsPage: React.FC = () => {
             </div>
 
             {sliderValue && (
-              <div
-                className="filter-inline"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  width: "400px",
-                  margin: 0,
-                }}
-              >
-                <label
-                  className="filter-label"
-                  style={{ minWidth: "90px", marginRight: "16px" }}
-                >
-                  Date Range:
-                </label>
-                <div style={{ flex: 1 }}>
+              <div className="filter-inline audit-slider-wrapper">
+                <label className="filter-label slider-label">Date Range:</label>
+                <div className="slider-container">
                   <Slider
                     range
-                    trackStyle={{ backgroundColor: '#418fde' }}
-                    handleStyle={{
-                      borderColor: '#418fde'
-                    }}
+                    trackStyle={{ backgroundColor: "#418fde" }}
+                    handleStyle={{ borderColor: "#418fde" }}
                     min={minDate}
                     max={maxDate}
                     value={sliderValue}
@@ -231,15 +192,7 @@ const AuditLogsPage: React.FC = () => {
                       setFilterRange(value as [number, number])
                     }
                   />
-                  <div
-                    className="muted"
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginTop: "8px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
+                  <div className="muted slider-dates">
                     <span>{new Date(sliderValue[0]).toLocaleDateString()}</span>
                     <span>{new Date(sliderValue[1]).toLocaleDateString()}</span>
                   </div>
@@ -248,25 +201,12 @@ const AuditLogsPage: React.FC = () => {
             )}
           </div>
 
-          <div>
+          <div className="audit-export-wrapper">
             <button
               type="button"
-              className="btn-export"
+              className="btn-export-audit"
               onClick={handleExport}
               disabled={filteredLogs.length === 0}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 16px",
-                backgroundColor: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                fontWeight: 600,
-                cursor: filteredLogs.length === 0 ? "not-allowed" : "pointer",
-                opacity: filteredLogs.length === 0 ? 0.6 : 1,
-              }}
             >
               <i className="bi bi-download"></i> Export CSV
             </button>
@@ -293,41 +233,16 @@ const AuditLogsPage: React.FC = () => {
         {!loading && !error && (
           <section className="admin-table-card">
             <div className="admin-table">
-              <div className="admin-table-row admin-table-header">
-                {/* Applied minWidth: 0 to all cells to enforce layout proportions */}
-                <div
-                  className="admin-cell"
-                  style={{ flex: "0 0 180px", minWidth: 0 }}
-                >
-                  Timestamp
-                </div>
-                <div className="admin-cell" style={{ flex: "1", minWidth: 0 }}>
-                  User
-                </div>
-                <div
-                  className="admin-cell"
-                  style={{ flex: "0 0 130px", minWidth: 0 }}
-                >
-                  Role
-                </div>
-                <div
-                  className="admin-cell"
-                  style={{ flex: "1.5", minWidth: 0 }}
-                >
-                  Action
-                </div>
+              <div className="admin-table-row admin-table-header audit-table-row">
+                <div className="admin-cell log-col-time">Timestamp</div>
+                <div className="admin-cell log-col-user">User</div>
+                <div className="admin-cell log-col-role">Role</div>
+                <div className="admin-cell log-col-action">Action</div>
               </div>
 
               {filteredLogs.map((log) => (
-                <div className="admin-table-row" key={log.id}>
-                  <div
-                    className="admin-cell"
-                    style={{
-                      flex: "0 0 180px",
-                      minWidth: 0,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="admin-table-row audit-table-row" key={log.id}>
+                  <div className="admin-cell log-col-time">
                     {new Date(log.created_at).toLocaleString(undefined, {
                       year: "numeric",
                       month: "short",
@@ -337,53 +252,15 @@ const AuditLogsPage: React.FC = () => {
                     })}
                   </div>
 
-                  <div
-                    className="admin-cell"
-                    style={{ flex: "1", minWidth: 0, overflow: "hidden" }}
-                  >
-                    {/* Ellipsis added to email and user ID. Title attribute shows full text on hover. */}
-                    <div
-                      className="course-code"
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        width: "100%",
-                      }}
-                      title={log.email}
-                    >
+                  <div className="admin-cell log-col-user">
+                    <div className="log-email" title={log.email}>
                       {log.email}
                     </div>
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: "0.85rem",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        width: "100%",
-                      }}
-                    ></div>
                   </div>
 
-                  <div
-                    className="admin-cell"
-                    style={{ flex: "0 0 130px", minWidth: 0 }}
-                  >
-                    {log.user_type}
-                  </div>
+                  <div className="admin-cell log-col-role">{log.user_type}</div>
 
-                  <div
-                    className="admin-cell"
-                    style={{
-                      flex: "1.5",
-                      minWidth: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={log.action}
-                  >
+                  <div className="admin-cell log-col-action" title={log.action}>
                     {log.action}
                   </div>
                 </div>
@@ -391,10 +268,7 @@ const AuditLogsPage: React.FC = () => {
 
               {filteredLogs.length === 0 && (
                 <div className="admin-table-row admin-empty-row">
-                  <div
-                    className="admin-cell"
-                    style={{ gridColumn: "1 / -1", justifyContent: "center" }}
-                  >
+                  <div className="admin-cell log-col-empty">
                     <span className="muted">
                       No audit logs found matching these filters.
                     </span>

@@ -94,10 +94,18 @@
 
 .major-select {
   flex: 1;
+  min-width: 0; /* CRITICAL FIX: Allows the dropdown to shrink below its text width */
+  max-width: 100%; /* Ensures it never exceeds its container */
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
   border: 1px solid #d1d5db;
   font-size: 0.9rem;
+  box-sizing: border-box;
+
+  /* Handle long text gracefully so it doesn't stretch the box */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Classes grid */
@@ -275,17 +283,6 @@
   font-size: 0.9rem;
 }
 
-/* Adjust layout for smaller screens */
-@media (max-width: 768px) {
-  .dashboard-main {
-    padding-inline: 1rem;
-  }
-
-  .class-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 /* Checked state for course chip */
 .class-option.checked {
   color: #131d43;
@@ -447,5 +444,81 @@
   100% {
     opacity: 0;
     transform: translateY(10px);
+  }
+}
+
+/* --- Adjust layout for smaller screens (Mobile Optimization) --- */
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 1rem;
+    max-width: 100%;
+  }
+
+  /* Override the 75% max-width from desktop so cards use the full phone screen */
+  .card-surface {
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  /* Make dropdown easier to tap */
+  .major-select {
+    min-height: 48px;
+  }
+
+  /* Stack classes into a single column so text doesn't overflow */
+  .class-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Ensure touch-friendly sizes for buttons */
+  .class-option-box {
+    min-height: 48px;
+  }
+
+  .offering-pill {
+    min-height: 44px;
+  }
+
+  /* Stack the AI Generate controls vertically */
+  .generate-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 1.25rem;
+  }
+
+  /* Center the toggle switch */
+  .generation-toggle-wrap {
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* Make the main generate button wide and tall */
+  .btn-generate {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  /* Stack the Results header and action buttons */
+  .bullets-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  /* Make the Save/Export buttons take up the full width evenly */
+  .bullets-button {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .btn-export {
+    flex: 1;
+    min-height: 44px;
+    text-align: center;
+  }
+
+  .icon-button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }

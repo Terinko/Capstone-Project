@@ -98,6 +98,34 @@
   cursor: not-allowed;
 }
 
+/* Added specific classes for buttons extracted from inline TSX styles */
+.btn-add-course {
+  background: #131d43;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.btn-add-course:hover:not(:disabled) {
+  background: #0a0f24;
+}
+
+.btn-claim-course {
+  background: #131d43;
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: opacity 0.2s;
+}
+
+.btn-claim-course:hover {
+  opacity: 0.85;
+}
+
 .form-error {
   color: #b42318;
   font-weight: 600;
@@ -165,16 +193,6 @@
   justify-content: flex-end;
 }
 
-@media (max-width: 768px) {
-  .faculty-form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .competency-checkbox-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 .skill-no-matches {
   margin-top: 8px;
   opacity: 0.8;
@@ -192,4 +210,160 @@
   background: #131d43;
   border-radius: 12px;
   padding: 0.5rem 0;
+}
+
+/* --- Adjust layout for smaller screens (Mobile Optimization) --- */
+@media (max-width: 768px) {
+  /* Modals/Forms */
+  .faculty-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .competency-checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Core container */
+  .admin-content {
+    padding: 1rem;
+  }
+
+  /* Filter bar structure */
+  .admin-filter-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.25rem;
+  }
+
+  .filter-left {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .filter-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .filter-label {
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-height: 48px; /* Touch friendly */
+    box-sizing: border-box;
+    margin-left: 0 !important;
+  }
+
+  /* Buttons */
+  .btn-add-course {
+    width: 100%;
+    margin-left: 0;
+    min-height: 48px;
+  }
+
+  .btn-claim-course {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* * MOBILE TABLE -> CARD CONVERSION 
+   * Hides the horizontal grid structure and stacks cells vertically
+   */
+  .admin-table {
+    display: block;
+  }
+
+  .admin-table-header {
+    display: none !important; /* Hide column headers completely */
+  }
+
+  .admin-table-row {
+    display: flex !important;
+    flex-direction: column;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    padding: 1.25rem;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .admin-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  /* Fix padding inside list items so they don't indent too far */
+  .admin-cell ul {
+    padding-left: 1.25rem;
+    margin: 0;
+  }
+
+  /* Inject headers using pseudo-elements so users know what the data is */
+  .admin-cell-professor::before {
+    content: "Professor";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .admin-cell-skills::before {
+    content: "Skills";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .admin-cell-competencies::before {
+    content: "Competencies";
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  /* Style the course title row to act as the "Header" of the card */
+  .admin-cell-course {
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .course-code {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* Keep the edit button nicely aligned on the right */
+  .competency-content {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .edit-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+    background: #f8fafc;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

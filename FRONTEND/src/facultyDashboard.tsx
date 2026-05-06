@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/facultyDashboard.tsx
 import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 import Footer from "./footer";
@@ -438,12 +439,7 @@ const FacultyDashboard: React.FC = () => {
           <button
             onClick={handleAddCourse}
             type="button"
-            className="faculty-submit-button"
-            style={{
-              marginLeft: "auto",
-              whiteSpace: "nowrap",
-              background: "#131d43",
-            }}
+            className="faculty-submit-button btn-add-course"
           >
             Add Course
           </button>
@@ -696,17 +692,7 @@ const FacultyDashboard: React.FC = () => {
                     <div className="admin-cell admin-cell-professor">
                       <button
                         type="button"
-                        style={{
-                          background: "#131d43",
-                          color: "#ffffff",
-                          border: "none",
-                          padding: "6px 14px",
-                          borderRadius: "6px",
-                          fontSize: "0.85rem",
-                          cursor: "pointer",
-                          fontWeight: 600,
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                        }}
+                        className="btn-claim-course"
                         onClick={async () => {
                           try {
                             await apiFetch(
