@@ -5,6 +5,7 @@ import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
 import { apiClient } from "./services/apiClient";
+import { useSchools } from "./hooks/useSchools";
 
 const getVal = (obj: any, key: string) => {
   if (!obj) return undefined;
@@ -14,22 +15,8 @@ const getVal = (obj: any, key: string) => {
   return undefined;
 };
 
-type MajorOption =
-  | "Software Engineering"
-  | "Computer Science"
-  | "Mechanical Engineering"
-  | "Civil Engineering"
-  | "Engineering"
-  | "Industrial Engineering";
-
-const MAJORS: MajorOption[] = [
-  "Engineering",
-  "Software Engineering",
-  "Computer Science",
-  "Mechanical Engineering",
-  "Industrial Engineering",
-  "Civil Engineering",
-];
+// Used until the student's own major is known
+const DEFAULT_MAJOR = "Software Engineering";
 
 type GenerationMode = "skills" | "talkingPoints";
 
@@ -51,7 +38,9 @@ interface Skill {
 }
 
 const StudentDashboard: React.FC = () => {
-  const [major, setMajor] = useState<MajorOption>("Software Engineering");
+  const schools = useSchools();
+  const [schoolId, setSchoolId] = useState<number | null>(null);
+  const [majorId, setMajorId] = useState<number | null>(null);
   const [checkedCodes, setCheckedCodes] = useState<Set<string>>(new Set());
   const [versionSelections, setVersionSelections] = useState<
     Record<string, string>
@@ -68,31 +57,88 @@ const StudentDashboard: React.FC = () => {
   const [generationMode, setGenerationMode] =
     useState<GenerationMode>("skills");
 
-  const [majorClasses, setMajorClasses] = useState<Record<
-    MajorOption,
-    ClassOption[]
-  > | null>(null);
+  const [majorClasses, setMajorClasses] = useState<ClassOption[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState<boolean>(false);
 
-  // 1. FETCH CLASSES ON MOUNT
+  const majorsForSchool = useMemo(
+    () => schools.find((s) => s.id === schoolId)?.majors ?? [],
+    [schools, schoolId],
+  );
+  const major =
+    majorsForSchool.find((m) => m.id === majorId)?.name ?? "this major";
+
+  // 1. PICK A STARTING SCHOOL + MAJOR: the student's own major if set
   useEffect(() => {
-    const fetchMajorClasses = async () => {
-      try {
-        const result =
-          await apiClient<Record<MajorOption, ClassOption[]>>("/courses");
-        setMajorClasses(result);
-      } catch (err) {
-        console.error("Failed to load classes:", err);
+    if (schools.length === 0 || majorId !== null) return;
+
+    const pick = (id?: number | null, name?: string) => {
+      for (const school of schools) {
+        const match = school.majors.find(
+          (m) => (id != null && m.id === id) || (!!name && m.name === name),
+        );
+        if (match) return { schoolId: school.id, majorId: match.id };
       }
+      return null;
     };
 
-    fetchMajorClasses();
-  }, []);
+    (async () => {
+      let start = null;
+      try {
+        const me = await apiClient<{ major?: string; majorId?: number | null }>(
+          "/api/auth/me",
+        );
+        start = pick(me.majorId, me.major);
+      } catch {
+        // not a student session; fall back to the default below
+      }
+
+      start = start ??
+        pick(null, DEFAULT_MAJOR) ?? {
+          schoolId: schools[0].id,
+          majorId: schools[0].majors[0]?.id ?? null,
+        };
+
+      setSchoolId(start.schoolId);
+      setMajorId(start.majorId);
+    })();
+  }, [schools, majorId]);
+
+  // 2. FETCH CLASSES FOR THE SELECTED MAJOR
+  useEffect(() => {
+    if (majorId === null) {
+      setMajorClasses([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClasses(true);
+
+    apiClient<ClassOption[]>(`/courses/majors/${majorId}`)
+      .then((result) => {
+        if (!cancelled) setMajorClasses(Array.isArray(result) ? result : []);
+      })
+      .catch((err) => {
+        console.error("Failed to load classes:", err);
+        if (!cancelled) setMajorClasses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingClasses(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [majorId]);
+
+  const resetSelections = () => {
+    setCheckedCodes(new Set());
+    setVersionSelections({});
+    setBullets([]);
+    setErrorMsg(null);
+  };
 
   const availableClasses = useMemo(() => {
-    const baseClasses =
-      majorClasses && majorClasses[major] ? majorClasses[major] : [];
-
-    return baseClasses.map((course) => {
+    return majorClasses.map((course) => {
       const hasAlternate = course.offerings.some(
         (o) => o.altName && o.altName.trim() !== "",
       );
@@ -109,7 +155,7 @@ const StudentDashboard: React.FC = () => {
 
       return { ...course, offerings: filteredOfferings };
     });
-  }, [majorClasses, major]);
+  }, [majorClasses]);
 
   const courseNameByCode = useMemo(() => {
     return availableClasses.reduce<Record<string, string>>((acc, course) => {
@@ -118,7 +164,7 @@ const StudentDashboard: React.FC = () => {
     }, {});
   }, [availableClasses]);
 
-  // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
+  // 3. LOAD SKILLS WHEN THE CLASSES CHANGE
   useEffect(() => {
     const loadSkillsForClasses = async () => {
       if (!availableClasses || availableClasses.length === 0) {
@@ -140,9 +186,9 @@ const StudentDashboard: React.FC = () => {
         }
 
         const { data: mappingsData, error: mappingsError } = await supabase
-          .from("Courses_Skill_Mapping")
+          .from("courses_skill_mapping")
           .select("*")
-          .in("Course_Id", allOfferingIds);
+          .in("course_id", allOfferingIds);
 
         if (mappingsError) throw mappingsError;
 
@@ -152,27 +198,27 @@ const StudentDashboard: React.FC = () => {
         }
 
         const skillIds = [
-          ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
+          ...new Set(mappingsData.map((m) => getVal(m, "skill_id"))),
         ];
 
         const { data: skillsData, error: skillsError } = await supabase
-          .from("Skills")
+          .from("skills")
           .select("*")
-          .in("Skill_Id", skillIds);
+          .in("skill_id", skillIds);
 
         if (skillsError) throw skillsError;
 
         const allSkills = (skillsData || []).map((s) => ({
-          Skill_Id: getVal(s, "Skill_Id"),
-          Skill_Name: getVal(s, "Skill_name"),
-          Type: getVal(s, "Type"),
+          Skill_Id: getVal(s, "skill_id"),
+          Skill_Name: getVal(s, "skill_name"),
+          Type: getVal(s, "type"),
         }));
 
         const skillsLookup: Record<string, Skill[]> = {};
 
         mappingsData.forEach((mapping) => {
-          const mCourseId = getVal(mapping, "Course_Id");
-          const mSkillId = getVal(mapping, "Skill_Id");
+          const mCourseId = getVal(mapping, "course_id");
+          const mSkillId = getVal(mapping, "skill_id");
           const key = String(mCourseId);
 
           const skillDetail = allSkills.find(
@@ -203,7 +249,7 @@ const StudentDashboard: React.FC = () => {
     };
 
     loadSkillsForClasses();
-  }, [major, majorClasses]);
+  }, [availableClasses]);
 
   const toggleCourse = (courseCode: string) => {
     setCheckedCodes((prev) => {
@@ -276,10 +322,7 @@ const StudentDashboard: React.FC = () => {
 
   const handleGenerate = () => {
     if (!availableClasses || availableClasses.length === 0) {
-      setBullets([
-        `Class-based content for ${major} is coming soon.`,
-        "For now, try selecting Software Engineering to see an example.",
-      ]);
+      setBullets([`No classes are listed for ${major} yet.`]);
       return;
     }
 
@@ -449,7 +492,7 @@ const StudentDashboard: React.FC = () => {
         <section className="dashboard-title-block">
           <h1 className="dashboard-title">Student Dashboard</h1>
           <p className="dashboard-subtitle">
-            Everything you need, in one place.
+            Your career services tools, all in one place.
           </p>
         </section>
 
@@ -459,21 +502,45 @@ const StudentDashboard: React.FC = () => {
 
             <div className="major-row">
               <select
-                id="major-select"
+                id="school-select"
                 className="major-select"
-                value={major}
+                aria-label="School"
+                value={schoolId ?? ""}
                 onChange={(e) => {
-                  const newMajor = e.target.value as MajorOption;
-                  setMajor(newMajor);
-                  setCheckedCodes(new Set());
-                  setVersionSelections({});
-                  setBullets([]);
-                  setErrorMsg(null);
+                  const newSchoolId = Number(e.target.value);
+                  const firstMajor = schools.find((s) => s.id === newSchoolId)
+                    ?.majors[0];
+                  setSchoolId(newSchoolId);
+                  setMajorId(firstMajor?.id ?? null);
+                  resetSelections();
                 }}
               >
-                {MAJORS.map((major, index) => (
-                  <option key={index} value={major}>
-                    {major}
+                {schools.length === 0 && <option value="">Loading...</option>}
+                {schools.map((school) => (
+                  <option key={school.id} value={school.id}>
+                    {school.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="major-row">
+              <select
+                id="major-select"
+                className="major-select"
+                aria-label="Major"
+                value={majorId ?? ""}
+                onChange={(e) => {
+                  setMajorId(Number(e.target.value));
+                  resetSelections();
+                }}
+              >
+                {majorsForSchool.length === 0 && (
+                  <option value="">No majors</option>
+                )}
+                {majorsForSchool.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
                   </option>
                 ))}
               </select>
@@ -482,7 +549,14 @@ const StudentDashboard: React.FC = () => {
             <div className="card-row">
               <span className="field-label">Select Classes:</span>
 
-              {isLoadingSkills ? (
+              {isLoadingClasses ? (
+                <p
+                  className="text-muted"
+                  style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
+                >
+                  Loading classes...
+                </p>
+              ) : isLoadingSkills ? (
                 <p
                   className="text-muted"
                   style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}

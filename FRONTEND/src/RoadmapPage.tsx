@@ -1,0 +1,363 @@
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import Navbar from "./Navbar";
+import Footer from "./footer";
+import { useCareerProgress } from "./context/careerProgress";
+import {
+  CATEGORIES,
+  CLASS_YEARS,
+  type Category,
+  type ClassYear,
+  type Milestone,
+} from "./career/careerData";
+import "./studentDashboard.css";
+import "./RoadmapPage.css";
+
+const yearLabel = (y: ClassYear) => CLASS_YEARS.find((c) => c.id === y)?.label ?? y;
+const goalLabel = (g: string | null) => (g === "GRAD" ? "Graduate school" : "Industry");
+const fromAssessment = (m: Milestone) => m.source === "GAP" || m.source === "EXPERIENCE";
+
+const RoadmapPage: React.FC = () => {
+  const {
+    loading,
+    error,
+    profile,
+    roadmap,
+    milestones,
+    progress,
+    lastAssessmentAt,
+    toggleMilestone,
+    regenerate,
+  } = useCareerProgress();
+  const [yearFilter, setYearFilter] = useState<ClassYear | "ALL">("ALL");
+  const [mobileTab, setMobileTab] = useState<Category>("COURSE");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const selected = milestones.find((x) => x.id === selectedId) ?? null;
+  // Progress counts required milestones only; optional ones are extras.
+  const required = milestones.filter((x) => x.required);
+  const total = required.length;
+  const done = required.filter((x) => x.status === "COMPLETE").length;
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSelectedId(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  const visible = (cat: Category) =>
+    milestones.filter(
+      (x) => x.category === cat && (yearFilter === "ALL" || x.classYear === yearFilter),
+    );
+
+  return (
+    <div className="dashboard-page">
+      <Navbar />
+
+      <main className="dashboard-main roadmap-main">
+        <section className="roadmap-header">
+          <div>
+            <h1 className="dashboard-title roadmap-title">Your Career Roadmap</h1>
+            {profile && (
+              <p className="roadmap-meta">
+                {[
+                  profile.major ?? "No major set",
+                  profile.classYear && yearLabel(profile.classYear),
+                  profile.careerGoal &&
+                    `Goal: ${profile.careerGoal} (${goalLabel(profile.goalType)})`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
+          <div className="roadmap-actions">
+            <Link to="/skill-assessment" className="rm-btn rm-btn-primary">
+              <i className="bi bi-clipboard-check" />{" "}
+              {lastAssessmentAt ? "Retake assessment" : "Take skill assessment"}
+            </Link>
+            <button
+              type="button"
+              className="rm-btn rm-btn-ghost"
+              onClick={() => regenerate().catch(() => {})}
+              disabled={loading}
+              title="Rebuild pending milestones from your major and goal. Completed ones are kept."
+            >
+              <i className="bi bi-arrow-clockwise" /> Refresh roadmap
+            </button>
+          </div>
+        </section>
+
+        {error && (
+          <div className="roadmap-banner roadmap-banner-error" role="alert">
+            <i className="bi bi-exclamation-circle" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {loading && milestones.length === 0 && (
+          <div className="roadmap-banner" role="status">
+            <i className="bi bi-hourglass-split" />
+            <span>Building your roadmap…</span>
+          </div>
+        )}
+
+        {/* REQ-ROAD-9: say when this is the general roadmap, not one for the major */}
+        {roadmap?.usesDefaultTemplate && (
+          <div className="roadmap-banner roadmap-banner-info" role="note">
+            <i className="bi bi-signpost-2" />
+            <span>
+              <strong>General roadmap.</strong>{" "}
+              {profile?.major ? (
+                <>
+                  Career Development hasn't built a roadmap for {profile.major} yet,
+                  so this one is shared by all students. Your major's courses are
+                  still included, and we've let them know it's needed.
+                </>
+              ) : (
+                <>
+                  This roadmap is shared by all students.{" "}
+                  <Link to="/skill-assessment">Add your major</Link> to get one
+                  built around your program.
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
+        {!loading && !lastAssessmentAt && (
+          <div className="roadmap-banner">
+            <i className="bi bi-info-circle" />
+            <span>
+              This roadmap uses your major's courses and a standard plan.{" "}
+              <Link to="/skill-assessment">Take the skill assessment</Link> to
+              personalize it.
+            </span>
+          </div>
+        )}
+
+        {/* Overall progress + per-category breakdown (REQ-PROG-1, REQ-PROG-6) */}
+        <section className="rm-progress-card">
+          <div className="rm-progress-top">
+            <div>
+              <span className="rm-progress-label">Overall career readiness</span>
+              <span className="rm-progress-sub">
+                {done} of {total} required milestones complete
+                {progress.optional.total > 0 &&
+                  ` · ${progress.optional.done} of ${progress.optional.total} optional`}
+              </span>
+            </div>
+            <span className="rm-progress-pct">{progress.overall}%</span>
+          </div>
+          <div
+            className="rm-bar"
+            role="progressbar"
+            aria-valuenow={progress.overall}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Overall career readiness"
+          >
+            <div className="rm-bar-fill" style={{ width: `${progress.overall}%` }} />
+            {[25, 50, 75].map((t) => (
+              <span key={t} className="rm-bar-tick" style={{ left: `${t}%` }} />
+            ))}
+          </div>
+          <div className="rm-cat-row">
+            {CATEGORIES.map((c) => {
+              const p = progress.byCategory[c.id];
+              return (
+                <div key={c.id} className="rm-cat-chip">
+                  <i className={`bi ${c.icon}`} />
+                  <span className="rm-cat-name">{c.label}</span>
+                  <span className="rm-cat-pct">{p.pct}%</span>
+                  <div className="rm-mini-bar">
+                    <div style={{ width: `${p.pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Year filter (REQ-ROAD-3) */}
+        <div className="rm-year-filter" role="group" aria-label="Filter by class year">
+          {[{ id: "ALL" as const, label: "All years" }, ...CLASS_YEARS].map((y) => (
+            <button
+              key={y.id}
+              type="button"
+              className={`rm-year-btn ${yearFilter === y.id ? "active" : ""}`}
+              aria-pressed={yearFilter === y.id}
+              onClick={() => setYearFilter(y.id)}
+            >
+              {y.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category tabs, shown on phones only */}
+        <div className="rm-tabs" role="tablist">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === c.id}
+              className={`rm-tab ${mobileTab === c.id ? "active" : ""}`}
+              onClick={() => setMobileTab(c.id)}
+            >
+              <i className={`bi ${c.icon}`} />
+              <span>{c.label.split(" ")[0]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Category tracks (REQ-ROAD-2, REQ-ROAD-5) */}
+        <section className="rm-tracks">
+          {CATEGORIES.map((c) => {
+            const items = visible(c.id);
+            return (
+              <div
+                key={c.id}
+                className={`rm-track ${mobileTab === c.id ? "mobile-active" : ""}`}
+              >
+                <div className="rm-track-head">
+                  <i className={`bi ${c.icon}`} />
+                  <h2>{c.label}</h2>
+                  <span className="rm-track-pct">{progress.byCategory[c.id].pct}%</span>
+                </div>
+
+                {items.length === 0 && (
+                  <p className="rm-empty">No milestones for this year.</p>
+                )}
+
+                {CLASS_YEARS.map((y) => {
+                  const group = items.filter((x) => x.classYear === y.id);
+                  if (!group.length) return null;
+                  return (
+                    <div key={y.id} className="rm-year-group">
+                      <h3 className="rm-year-heading">{y.label}</h3>
+                      {group.map((ms) => {
+                        const isDone = ms.status === "COMPLETE";
+                        return (
+                          <div
+                            key={ms.id}
+                            className={`rm-milestone ${isDone ? "done" : ""} ${
+                              selectedId === ms.id ? "selected" : ""
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              className="rm-check"
+                              aria-label={`${isDone ? "Mark incomplete" : "Mark complete"}: ${ms.name}`}
+                              aria-pressed={isDone}
+                              onClick={() => toggleMilestone(ms.id)}
+                            >
+                              {isDone && <i className="bi bi-check-lg" />}
+                            </button>
+                            <button
+                              type="button"
+                              className="rm-milestone-body"
+                              onClick={() => setSelectedId(ms.id)}
+                            >
+                              <span className="rm-milestone-name">{ms.name}</span>
+                              {!ms.required && (
+                                <span className="rm-badge rm-badge-optional">Optional</span>
+                              )}
+                              {fromAssessment(ms) && (
+                                <span className="rm-badge">From assessment</span>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </section>
+      </main>
+
+      {/* Milestone detail panel */}
+      {selected && (
+        <>
+          <div className="rm-panel-scrim" onClick={() => setSelectedId(null)} />
+          <aside className="rm-panel" aria-label="Milestone details">
+            <button
+              type="button"
+              className="rm-panel-close"
+              onClick={() => setSelectedId(null)}
+              aria-label="Close details"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+            <span className="rm-panel-cat">
+              {CATEGORIES.find((c) => c.id === selected.category)?.label}
+            </span>
+            <h2 className="rm-panel-title">{selected.name}</h2>
+            <p className="rm-panel-desc">{selected.description}</p>
+
+            {selected.resources.length > 0 && (
+              <>
+                <h3 className="rm-panel-sub">Ways to do this</h3>
+                <ul className="rm-resource-list">
+                  {selected.resources.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <dl className="rm-panel-facts">
+              {selected.component && (
+                <>
+                  <dt>Area</dt>
+                  <dd>{selected.component}</dd>
+                </>
+              )}
+              <dt>Type</dt>
+              <dd>
+                {selected.required
+                  ? "Required"
+                  : "Optional: recommended, but doesn't count against your progress"}
+              </dd>
+              <dt>Suggested year</dt>
+              <dd>{yearLabel(selected.classYear)}</dd>
+              <dt>Status</dt>
+              <dd>{selected.status === "COMPLETE" ? "Complete" : "Not started"}</dd>
+            </dl>
+
+            {selected.competencies.length > 0 && (
+              <>
+                <h3 className="rm-panel-sub">Skills this helps you build</h3>
+                <div className="rm-comp-list">
+                  {selected.competencies.map((c) => (
+                    <span key={c.id} className="rm-comp">
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <button
+              type="button"
+              className={`rm-btn ${
+                selected.status === "COMPLETE" ? "rm-btn-ghost" : "rm-btn-primary"
+              } rm-panel-action`}
+              onClick={() => toggleMilestone(selected.id)}
+            >
+              {selected.status === "COMPLETE" ? "Mark as not complete" : "Mark complete"}
+            </button>
+          </aside>
+        </>
+      )}
+
+      <Footer />
+    </div>
+  );
+};
+
+export default RoadmapPage;

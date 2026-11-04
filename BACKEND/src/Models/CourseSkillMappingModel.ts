@@ -1,11 +1,12 @@
 import { supabase } from "../Database/supabaseClient.js";
+import { chunk, fetchAllPages } from "./CoursesModel.js";
 
-// Pull course + mapped skills (with Type so we can split skills vs competencies)
+// Pull course + mapped skills (with type so we can split skills vs competencies)
 export async function getCourseMappings(courseId: number) {
   const { data, error } = await supabase
-    .from("Courses_Skill_Mapping")
-    .select("Skills(Skill_name, Type)")
-    .eq("Course_Id", courseId);
+    .from("courses_skill_mapping")
+    .select("skills(skill_name, type)")
+    .eq("course_id", courseId);
 
   if (error) throw new Error(error.message);
 
@@ -13,19 +14,50 @@ export async function getCourseMappings(courseId: number) {
   const competencies: string[] = [];
 
   for (const row of data ?? []) {
-    const skill = (row as any).Skills;
+    const skill = (row as any).skills;
     if (!skill) continue;
 
-    const type = skill.Type as boolean | undefined;
+    const type = skill.type as boolean | undefined;
 
     if (type === true) {
-      if (skill.Skill_name) competencies.push(skill.Skill_name);
+      if (skill.skill_name) competencies.push(skill.skill_name);
     } else {
-      if (skill.Skill_name) skills.push(skill.Skill_name);
+      if (skill.skill_name) skills.push(skill.skill_name);
     }
   }
 
   return { skills, competencies };
+}
+
+// Same split as getCourseMappings, for many courses in a few queries.
+export async function getMappingsForCourseIds(courseIds: number[]) {
+  const result = new Map<
+    number,
+    { skills: string[]; competencies: string[] }
+  >();
+  for (const id of courseIds) result.set(id, { skills: [], competencies: [] });
+
+  for (const ids of chunk(Array.from(new Set(courseIds)))) {
+    const rows = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("courses_skill_mapping")
+        .select("course_id, skill_id, skills(skill_name, type)")
+        .in("course_id", ids)
+        .order("course_id", { ascending: true })
+        .order("skill_id", { ascending: true })
+        .range(from, to),
+    );
+
+    for (const row of rows) {
+      const skill = row.skills;
+      const entry = result.get(row.course_id);
+      if (!skill?.skill_name || !entry) continue;
+      if (skill.type === true) entry.competencies.push(skill.skill_name);
+      else entry.skills.push(skill.skill_name);
+    }
+  }
+
+  return result;
 }
 
 export async function replaceCourseMappings(
@@ -33,17 +65,17 @@ export async function replaceCourseMappings(
   skillIds: number[],
 ) {
   const del = await supabase
-    .from("Courses_Skill_Mapping")
+    .from("courses_skill_mapping")
     .delete()
-    .eq("Course_Id", courseId);
+    .eq("course_id", courseId);
 
   if (del.error) throw new Error(del.error.message);
 
   if (skillIds.length === 0) return;
 
-  const rows = skillIds.map((sid) => ({ Course_Id: courseId, Skill_Id: sid }));
+  const rows = skillIds.map((sid) => ({ course_id: courseId, skill_id: sid }));
 
-  const ins = await supabase.from("Courses_Skill_Mapping").insert(rows);
+  const ins = await supabase.from("courses_skill_mapping").insert(rows);
   if (ins.error) throw new Error(ins.error.message);
 }
 
@@ -58,9 +90,9 @@ export async function replaceMappingsForCourseIds(
   if (uniqueCourseIds.length === 0) return;
 
   const del = await supabase
-    .from("Courses_Skill_Mapping")
+    .from("courses_skill_mapping")
     .delete()
-    .in("Course_Id", uniqueCourseIds);
+    .in("course_id", uniqueCourseIds);
 
   if (del.error) throw new Error(del.error.message);
 
@@ -72,37 +104,37 @@ export async function replaceMappingsForCourseIds(
 
   const rows = uniqueCourseIds.flatMap((courseId) =>
     uniqueSkillIds.map((skillId) => ({
-      Course_Id: courseId,
-      Skill_Id: skillId,
+      course_id: courseId,
+      skill_id: skillId,
     })),
   );
 
   if (rows.length === 0) return;
 
-  const ins = await supabase.from("Courses_Skill_Mapping").insert(rows);
+  const ins = await supabase.from("courses_skill_mapping").insert(rows);
   if (ins.error) throw new Error(ins.error.message);
 }
 
 // Used when deleting a Skill itself: remove all mappings everywhere
 export async function deleteMappingsBySkillId(skillId: number) {
   const del = await supabase
-    .from("Courses_Skill_Mapping")
+    .from("courses_skill_mapping")
     .delete()
-    .eq("Skill_Id", skillId);
+    .eq("skill_id", skillId);
 
   if (del.error) throw new Error(del.error.message);
 }
 
 export async function isCourseFullyMapped(courseId: number) {
   const { data, error } = await supabase
-    .from("Courses_Skill_Mapping")
+    .from("courses_skill_mapping")
     .select(
       `
-      Skill_Id,
-      Skills(Type)
+      skill_id,
+      skills(type)
     `,
     )
-    .eq("Course_Id", courseId);
+    .eq("course_id", courseId);
 
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) return false;
@@ -111,7 +143,7 @@ export async function isCourseFullyMapped(courseId: number) {
   let hasCompetency = false;
 
   for (const row of data as any[]) {
-    const type = row.Skills?.[0]?.Type;
+    const type = row.skills?.[0]?.type;
 
     if (type === false) hasSkill = true;
     if (type === true) hasCompetency = true;

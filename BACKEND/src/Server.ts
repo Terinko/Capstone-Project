@@ -13,9 +13,13 @@ import AuditRouter from "./Routers/AuditRouter.js";
 import { historyRouter } from "./Routers/HistoryRouter.js";
 import resumeRouter from "./Routers/ResumeRouter.js";
 import publicCourseRouter from "./Routers/PublicCourseRouter.js"; // <-- NEW
+import { roadmapRouter, milestonesRouter } from "./Routers/RoadmapRouter.js";
+import { assessmentRouter } from "./Routers/AssessmentRouter.js";
+import { skillReviewRouter } from "./Routers/SkillReviewRouter.js";
 
 // --- Middleware Imports ---
 import { RequireAdmin, RequireAuth } from "./Middleware/RequireAuth.js";
+import { RequireStudent } from "./Middleware/RequireStudent.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -38,6 +42,10 @@ app.use("/api/admin", RequireAdmin, adminCoursesRouter);
 app.use("/api/audit-logs", AuditRouter);
 app.use("/api/autofill", autofillRouter);
 app.use("/api/resume", resumeRouter);
+app.use("/api/roadmap", RequireStudent, roadmapRouter);
+app.use("/api/milestones", RequireStudent, milestonesRouter);
+app.use("/api/assessment", RequireStudent, assessmentRouter);
+app.use("/api/reviews", RequireStudent, skillReviewRouter);
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 

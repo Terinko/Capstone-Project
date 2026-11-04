@@ -4,6 +4,18 @@ import "./Navbar.css";
 import quLogo from "./assets/Qyellow_logo.png";
 import EditAccountModal from "./EditAccountModal";
 import { loadSession, clearSession } from "./Session";
+import ProgressStrip from "./components/ProgressStrip";
+
+// Pages that show the pull-down career progress strip under the navbar.
+// The roadmap has its own progress bar, and the assessment shouldn't be cluttered.
+const STRIP_PATHS = ["/studentdashboard", "/history"];
+
+const STUDENT_LINKS = [
+  { path: "/skill-assessment", label: "Skill Assessment" },
+  { path: "/roadmap", label: "Roadmap" },
+  { path: "/skill-reviews", label: "Advisor Feedback" },
+  { path: "/history", label: "History" },
+];
 
 const Navbar: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
@@ -35,6 +47,8 @@ const Navbar: React.FC = () => {
         navigate("/studentdashboard");
       } else if (userType === "Administrator" || userType === "Admin") {
         navigate("/adminDashboard");
+      } else if (userType === "Faculty/Administrator") {
+        navigate("/facultyAdmin");
       } else {
         navigate("/"); // Fallback
       }
@@ -79,14 +93,72 @@ const Navbar: React.FC = () => {
           id="navbarContent"
         >
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-            {/* Student Navigation Toggle */}
-            {userType === "Student" && (
+            {/* Student pages. Like History, each link turns into "Dashboard"
+                while you're on that page, so you can always get back. */}
+            {userType === "Student" &&
+              STUDENT_LINKS.map((link) => (
+                <li className="nav-item" key={link.path}>
+                  <button
+                    className="nav-btn"
+                    onClick={() => handleToggleSubPage(link.path)}
+                  >
+                    {location.pathname === link.path ? "Dashboard" : link.label}
+                  </button>
+                </li>
+              ))}
+
+            {/* Faculty: de-identified student progress (REQ-PROG-7, REQ-ROAD-8) */}
+            {userType === "Faculty/Administrator" && (
               <li className="nav-item">
                 <button
                   className="nav-btn"
-                  onClick={() => handleToggleSubPage("/history")}
+                  onClick={() => handleToggleSubPage("/faculty-progress")}
                 >
-                  {location.pathname === "/history" ? "Dashboard" : "History"}
+                  {location.pathname === "/faculty-progress"
+                    ? "Dashboard"
+                    : "Student Progress"}
+                </button>
+              </li>
+            )}
+
+            {/* Faculty/advisors: review students' career skills */}
+            {(userType === "Faculty/Administrator" ||
+              userType === "Administrator" ||
+              userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/faculty-reviews")}
+                >
+                  {location.pathname === "/faculty-reviews"
+                    ? "Dashboard"
+                    : "Student Reviews"}
+                </button>
+              </li>
+            )}
+
+            {/* Admin: roadmap template milestones (add, edit, delete) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-milestones")}
+                >
+                  {location.pathname === "/admin-milestones"
+                    ? "Dashboard"
+                    : "Milestones"}
+                </button>
+              </li>
+            )}
+
+            {/* Admin: usage and progress reports (REQ-PROG-8) */}
+            {(userType === "Administrator" || userType === "Admin") && (
+              <li className="nav-item">
+                <button
+                  className="nav-btn"
+                  onClick={() => handleToggleSubPage("/admin-reports")}
+                >
+                  {location.pathname === "/admin-reports" ? "Dashboard" : "Reports"}
                 </button>
               </li>
             )}
@@ -119,6 +191,10 @@ const Navbar: React.FC = () => {
           </ul>
         </div>
       </nav>
+
+      {userType === "Student" && STRIP_PATHS.includes(location.pathname) && (
+        <ProgressStrip />
+      )}
 
       {showEditModal && userType && (
         <EditAccountModal

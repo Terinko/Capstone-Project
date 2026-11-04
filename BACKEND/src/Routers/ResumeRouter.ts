@@ -1,9 +1,30 @@
 // BACKEND/src/Routers/ResumeRouter.ts
 import express from "express";
+import { supabase } from "../Database/supabaseClient.js";
 // Optional: If you have an auth middleware, import it here to protect this route
 // import { requireAuth } from '../Middleware/RequireAuth';
 
 const router = express.Router();
+
+// One row per generation request for the admin report and AI budget
+// (SDS C9, ai_usage_log). Never stores the prompt or who asked. A failed
+// write is logged and ignored so it can't break generation.
+function logAiUsage(row: {
+  feature: string;
+  model: string;
+  latency_ms: number;
+  success: boolean;
+  fell_back: boolean;
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+}) {
+  supabase
+    .from("ai_usage_log")
+    .insert(row)
+    .then(({ error }) => {
+      if (error) console.error("Failed to log AI usage:", error.message);
+    });
+}
 
 const buildResumePrompt = (
   classBlocks: string,
@@ -73,8 +94,8 @@ router.post("/generate", async (req, res) => {
         ? buildResumePrompt(classBlocks)
         : buildTalkingPointsPrompt(classBlocks);
 
-    const API_KEY = process.env.VITE_AIAPIKEY;
-    const OPENROUTER_URL = process.env.VITE_OPEN_ROUTER_URL;
+    const API_KEY = process.env.AIAPIKEY;
+    const OPENROUTER_URL = process.env.OPEN_ROUTER_URL;
 
     if (!API_KEY || !OPENROUTER_URL) {
       throw new Error("Missing OpenRouter credentials in backend environment.");
@@ -92,6 +113,8 @@ router.post("/generate", async (req, res) => {
     }
 
     let lastError: any = null;
+    const feature = mode === "skills" ? "resume_bullets" : "talking_points";
+    const started = Date.now();
 
     // 2. Loop through the models. If one fails, try the next.
     for (const currentModel of fallbackModels) {
@@ -109,7 +132,7 @@ router.post("/generate", async (req, res) => {
             Authorization: `Bearer ${API_KEY}`,
             "Content-Type": "application/json",
             "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "Student Resume Dashboard",
+            "X-Title": "QU Career Services",
           },
           body: JSON.stringify(payload),
         });
@@ -130,6 +153,15 @@ router.post("/generate", async (req, res) => {
 
         // 3. SUCCESS! Send the response to the frontend and exit the function.
         console.log(`Success with ${currentModel}`);
+        logAiUsage({
+          feature,
+          model: currentModel,
+          latency_ms: Date.now() - started,
+          success: true,
+          fell_back: currentModel !== fallbackModels[0],
+          prompt_tokens: result.usage?.prompt_tokens ?? null,
+          completion_tokens: result.usage?.completion_tokens ?? null,
+        });
         return res.status(200).json({ text });
       } catch (err: any) {
         // Log the failure, save the error, and let the loop continue to the next model
@@ -140,11 +172,16 @@ router.post("/generate", async (req, res) => {
 
     // 4. If the loop finishes without returning, it means ALL models failed.
     console.error("All fallback models exhausted. Last error:", lastError);
-    return res
-      .status(500)
-      .json({
-        error: "Failed to generate AI content. Please try again later.",
-      });
+    logAiUsage({
+      feature,
+      model: fallbackModels[fallbackModels.length - 1] ?? "unknown",
+      latency_ms: Date.now() - started,
+      success: false,
+      fell_back: fallbackModels.length > 1,
+    });
+    return res.status(500).json({
+      error: "Failed to generate AI content. Please try again later.",
+    });
   } catch (error: any) {
     console.error("Backend AI Generation Error:", error);
     return res
