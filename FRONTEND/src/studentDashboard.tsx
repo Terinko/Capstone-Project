@@ -1,37 +1,20 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase } from "../supabaseClient";
+import { Link } from "react-router-dom";
 import { loadSession } from "./Session";
 import Footer from "./footer";
 import "./studentDashboard.css";
 import Navbar from "./Navbar";
 import { apiClient } from "./services/apiClient";
+import { useSchools } from "./hooks/useSchools";
+import CareerGoalsInput from "./components/CareerGoalsInput";
+import {
+  generateResumeContent,
+  type GenerationMode,
+  type ResumeSection,
+} from "./services/projectsApi";
 
-const getVal = (obj: any, key: string) => {
-  if (!obj) return undefined;
-  if (obj[key] !== undefined) return obj[key];
-  if (obj[key.toLowerCase()] !== undefined) return obj[key.toLowerCase()];
-  if (obj[key.toUpperCase()] !== undefined) return obj[key.toUpperCase()];
-  return undefined;
-};
-
-type MajorOption =
-  | "Software Engineering"
-  | "Computer Science"
-  | "Mechanical Engineering"
-  | "Civil Engineering"
-  | "Engineering"
-  | "Industrial Engineering";
-
-const MAJORS: MajorOption[] = [
-  "Engineering",
-  "Software Engineering",
-  "Computer Science",
-  "Mechanical Engineering",
-  "Industrial Engineering",
-  "Civil Engineering",
-];
-
-type GenerationMode = "skills" | "talkingPoints";
+// Used until the student's own major is known
+const DEFAULT_MAJOR = "Software Engineering";
 
 interface CourseOffering {
   id: string;
@@ -44,55 +27,114 @@ interface ClassOption {
   offerings: CourseOffering[];
 }
 
-interface Skill {
-  Skill_Id: string;
-  Skill_Name: string;
-  Type: boolean;
-}
-
 const StudentDashboard: React.FC = () => {
-  const [major, setMajor] = useState<MajorOption>("Software Engineering");
+  const schools = useSchools();
+  const [schoolId, setSchoolId] = useState<number | null>(null);
+  const [majorId, setMajorId] = useState<number | null>(null);
   const [checkedCodes, setCheckedCodes] = useState<Set<string>>(new Set());
   const [versionSelections, setVersionSelections] = useState<
     Record<string, string>
   >({});
   const [bullets, setBullets] = useState<string[]>([]);
-  const [courseSkills, setCourseSkills] = useState<Record<string, Skill[]>>({});
+  // which course or project each header in the AI output belongs to
+  const [sections, setSections] = useState<ResumeSection[]>([]);
+  const [careerGoals, setCareerGoals] = useState<string[]>([""]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showToast, setShowToast] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false);
 
-  const [generationMode, setGenerationMode] =
-    useState<GenerationMode>("skills");
+  // Resume bullet points have their own page (/resume); the dashboard
+  // writes interview talking points.
+  const generationMode: GenerationMode = "talkingPoints";
 
-  const [majorClasses, setMajorClasses] = useState<Record<
-    MajorOption,
-    ClassOption[]
-  > | null>(null);
+  const [majorClasses, setMajorClasses] = useState<ClassOption[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState<boolean>(false);
 
-  // 1. FETCH CLASSES ON MOUNT
+  const majorsForSchool = useMemo(
+    () => schools.find((s) => s.id === schoolId)?.majors ?? [],
+    [schools, schoolId],
+  );
+  const major =
+    majorsForSchool.find((m) => m.id === majorId)?.name ?? "this major";
+
+  // 1. PICK A STARTING SCHOOL + MAJOR: the student's own major if set
   useEffect(() => {
-    const fetchMajorClasses = async () => {
-      try {
-        const result =
-          await apiClient<Record<MajorOption, ClassOption[]>>("/courses");
-        setMajorClasses(result);
-      } catch (err) {
-        console.error("Failed to load classes:", err);
+    if (schools.length === 0 || majorId !== null) return;
+
+    const pick = (id?: number | null, name?: string) => {
+      for (const school of schools) {
+        const match = school.majors.find(
+          (m) => (id != null && m.id === id) || (!!name && m.name === name),
+        );
+        if (match) return { schoolId: school.id, majorId: match.id };
       }
+      return null;
     };
 
-    fetchMajorClasses();
-  }, []);
+    (async () => {
+      let start = null;
+      try {
+        const me = await apiClient<{
+          major?: string;
+          majorId?: number | null;
+          careerGoal?: string | null;
+        }>("/api/auth/me");
+        start = pick(me.majorId, me.major);
+        const goal = me.careerGoal?.trim();
+        if (goal) setCareerGoals((prev) => (prev.some((g) => g.trim()) ? prev : [goal]));
+      } catch {
+        // not a student session; fall back to the default below
+      }
+
+      start = start ??
+        pick(null, DEFAULT_MAJOR) ?? {
+          schoolId: schools[0].id,
+          majorId: schools[0].majors[0]?.id ?? null,
+        };
+
+      setSchoolId(start.schoolId);
+      setMajorId(start.majorId);
+    })();
+  }, [schools, majorId]);
+
+  // 2. FETCH CLASSES FOR THE SELECTED MAJOR
+  useEffect(() => {
+    if (majorId === null) {
+      setMajorClasses([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClasses(true);
+
+    apiClient<ClassOption[]>(`/courses/majors/${majorId}`)
+      .then((result) => {
+        if (!cancelled) setMajorClasses(Array.isArray(result) ? result : []);
+      })
+      .catch((err) => {
+        console.error("Failed to load classes:", err);
+        if (!cancelled) setMajorClasses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingClasses(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [majorId]);
+
+  const resetSelections = () => {
+    setCheckedCodes(new Set());
+    setVersionSelections({});
+    setBullets([]);
+    setErrorMsg(null);
+  };
 
   const availableClasses = useMemo(() => {
-    const baseClasses =
-      majorClasses && majorClasses[major] ? majorClasses[major] : [];
-
-    return baseClasses.map((course) => {
+    return majorClasses.map((course) => {
       const hasAlternate = course.offerings.some(
         (o) => o.altName && o.altName.trim() !== "",
       );
@@ -109,7 +151,7 @@ const StudentDashboard: React.FC = () => {
 
       return { ...course, offerings: filteredOfferings };
     });
-  }, [majorClasses, major]);
+  }, [majorClasses]);
 
   const courseNameByCode = useMemo(() => {
     return availableClasses.reduce<Record<string, string>>((acc, course) => {
@@ -117,93 +159,6 @@ const StudentDashboard: React.FC = () => {
       return acc;
     }, {});
   }, [availableClasses]);
-
-  // 2. LOAD SKILLS WHEN MAJOR OR CLASSES CHANGE
-  useEffect(() => {
-    const loadSkillsForClasses = async () => {
-      if (!availableClasses || availableClasses.length === 0) {
-        setCourseSkills({});
-        return;
-      }
-
-      setIsLoadingSkills(true);
-
-      try {
-        const allOfferingIds = availableClasses
-          .flatMap((c) => c.offerings.map((o) => Number(o.id)))
-          .filter((n) => !isNaN(n) && n > 0);
-
-        if (allOfferingIds.length === 0) {
-          setCourseSkills({});
-          setIsLoadingSkills(false);
-          return;
-        }
-
-        const { data: mappingsData, error: mappingsError } = await supabase
-          .from("Courses_Skill_Mapping")
-          .select("*")
-          .in("Course_Id", allOfferingIds);
-
-        if (mappingsError) throw mappingsError;
-
-        if (!mappingsData || mappingsData.length === 0) {
-          setCourseSkills({});
-          return;
-        }
-
-        const skillIds = [
-          ...new Set(mappingsData.map((m) => getVal(m, "Skill_Id"))),
-        ];
-
-        const { data: skillsData, error: skillsError } = await supabase
-          .from("Skills")
-          .select("*")
-          .in("Skill_Id", skillIds);
-
-        if (skillsError) throw skillsError;
-
-        const allSkills = (skillsData || []).map((s) => ({
-          Skill_Id: getVal(s, "Skill_Id"),
-          Skill_Name: getVal(s, "Skill_name"),
-          Type: getVal(s, "Type"),
-        }));
-
-        const skillsLookup: Record<string, Skill[]> = {};
-
-        mappingsData.forEach((mapping) => {
-          const mCourseId = getVal(mapping, "Course_Id");
-          const mSkillId = getVal(mapping, "Skill_Id");
-          const key = String(mCourseId);
-
-          const skillDetail = allSkills.find(
-            (s) => String(s.Skill_Id) === String(mSkillId),
-          );
-
-          if (skillDetail) {
-            if (!skillsLookup[key]) skillsLookup[key] = [];
-            if (
-              !skillsLookup[key].some(
-                (s) => s.Skill_Id === skillDetail.Skill_Id,
-              )
-            ) {
-              skillsLookup[key].push(skillDetail);
-            }
-          }
-        });
-
-        setCourseSkills(skillsLookup);
-      } catch (error: any) {
-        console.error("Error loading skills:", error);
-        setErrorMsg(
-          `Database Error: ${error.message || "Failed to load skills"}`,
-        );
-      } finally {
-        setIsLoadingSkills(false);
-      }
-    };
-
-    loadSkillsForClasses();
-  }, [major, majorClasses]);
 
   const toggleCourse = (courseCode: string) => {
     setCheckedCodes((prev) => {
@@ -238,22 +193,18 @@ const StudentDashboard: React.FC = () => {
     (c) => checkedCodes.has(c.courseCode) && getResolvedId(c) === null,
   ).length;
 
-  const generateWithAI = async (
-    skillsByClass: Record<string, string[]>,
-    mode: GenerationMode,
-  ) => {
+  // Projects are picked on the Resume page; talking points here come from
+  // classes only.
+  const generateWithAI = async (courseIds: number[], mode: GenerationMode) => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const payload = {
-        skillsByClass,
+      const result = await generateResumeContent({
         mode,
-      };
-
-      const result = await apiClient<{ text: string }>("/api/resume/generate", {
-        method: "POST",
-        body: JSON.stringify(payload),
+        courseIds,
+        projectIds: [],
+        careerGoals: careerGoals.map((g) => g.trim()).filter(Boolean),
       });
 
       const formattedBullets = result.text
@@ -262,12 +213,19 @@ const StudentDashboard: React.FC = () => {
         .filter((line: string) => line.length > 0);
 
       setBullets(formattedBullets);
-    } catch (error: any) {
+      setSections(result.sections ?? []);
+    } catch (error) {
       console.error("AI Generation Error:", error);
-      setErrorMsg(
+      const fallback =
         mode === "skills"
           ? "Failed to generate resume bullet points."
-          : "Failed to generate talking points.",
+          : "Failed to generate talking points.";
+      // show the server's reason for a bad selection; hide raw errors
+      const msg = error instanceof Error ? error.message : "";
+      setErrorMsg(
+        /^(Select|Pick|Enter|Keep|No skills|Career goals)/.test(msg)
+          ? msg
+          : fallback,
       );
     } finally {
       setIsLoading(false);
@@ -275,52 +233,27 @@ const StudentDashboard: React.FC = () => {
   };
 
   const handleGenerate = () => {
-    if (!availableClasses || availableClasses.length === 0) {
-      setBullets([
-        `Class-based content for ${major} is coming soon.`,
-        "For now, try selecting Software Engineering to see an example.",
-      ]);
-      return;
-    }
+    const courseIds = availableClasses
+      .map((course) => Number(getResolvedId(course)))
+      .filter((id) => Number.isInteger(id) && id > 0);
 
-    if (checkedCodes.size === 0) {
+    if (courseIds.length === 0) {
       setBullets([
-        generationMode === "skills"
-          ? "Select at least one class to generate bullet points."
+        availableClasses.length === 0
+          ? `No classes are listed for ${major} yet.`
           : "Select at least one class to generate talking points.",
       ]);
       return;
     }
 
-    const skillsByClass: Record<string, string[]> = {};
-
-    availableClasses.forEach((course) => {
-      const resolvedId = getResolvedId(course);
-      if (!resolvedId) return;
-
-      const skills = courseSkills[resolvedId];
-      if (skills && skills.length > 0) {
-        skillsByClass[course.courseCode] = skills
-          .map((skill) => skill.Skill_Name)
-          .filter(Boolean);
-      }
-    });
-
-    if (Object.keys(skillsByClass).length === 0) {
-      setBullets(["No skills found in the database for the selected classes."]);
-      return;
-    } else {
-      generateWithAI(skillsByClass, generationMode);
-    }
+    generateWithAI(courseIds, generationMode);
   };
 
   const handleCopy = () => {
     if (bullets.length === 0) return;
     navigator.clipboard.writeText(bullets.join("\n"));
     alert(
-      generationMode === "skills"
-        ? "Bullet points copied to clipboard!"
-        : "Talking points copied to clipboard!",
+      "Talking points copied to clipboard!",
     );
   };
 
@@ -332,9 +265,7 @@ const StudentDashboard: React.FC = () => {
     const a = document.createElement("a");
     a.href = url;
     a.download =
-      generationMode === "skills"
-        ? "generated-bullet-points.txt"
-        : "generated-talking-points.txt";
+      "generated-talking-points.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -408,8 +339,23 @@ const StudentDashboard: React.FC = () => {
         throw new Error("No talking points were found to save.");
       }
 
-      for (const [courseCode, talkingPoints] of entries) {
-        const courseName = courseNameByCode[courseCode] ?? courseCode;
+      for (const [label, talkingPoints] of entries) {
+        const section = sections.find(
+          (s) => s.label.toLowerCase() === label.toLowerCase(),
+        );
+        // Project talking points are saved under "PROJECT" with the title.
+        const courseCode =
+          section?.kind === "project"
+            ? "PROJECT"
+            : section?.kind === "course"
+              ? section.courseCode
+              : label;
+        const courseName =
+          section?.kind === "project"
+            ? section.title
+            : section?.kind === "course"
+              ? section.courseName
+              : (courseNameByCode[label] ?? label);
 
         await apiClient("/api/history", {
           method: "POST",
@@ -449,7 +395,7 @@ const StudentDashboard: React.FC = () => {
         <section className="dashboard-title-block">
           <h1 className="dashboard-title">Student Dashboard</h1>
           <p className="dashboard-subtitle">
-            Everything you need, in one place.
+            Your career services tools, all in one place.
           </p>
         </section>
 
@@ -459,21 +405,45 @@ const StudentDashboard: React.FC = () => {
 
             <div className="major-row">
               <select
-                id="major-select"
+                id="school-select"
                 className="major-select"
-                value={major}
+                aria-label="School"
+                value={schoolId ?? ""}
                 onChange={(e) => {
-                  const newMajor = e.target.value as MajorOption;
-                  setMajor(newMajor);
-                  setCheckedCodes(new Set());
-                  setVersionSelections({});
-                  setBullets([]);
-                  setErrorMsg(null);
+                  const newSchoolId = Number(e.target.value);
+                  const firstMajor = schools.find((s) => s.id === newSchoolId)
+                    ?.majors[0];
+                  setSchoolId(newSchoolId);
+                  setMajorId(firstMajor?.id ?? null);
+                  resetSelections();
                 }}
               >
-                {MAJORS.map((major, index) => (
-                  <option key={index} value={major}>
-                    {major}
+                {schools.length === 0 && <option value="">Loading...</option>}
+                {schools.map((school) => (
+                  <option key={school.id} value={school.id}>
+                    {school.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="major-row">
+              <select
+                id="major-select"
+                className="major-select"
+                aria-label="Major"
+                value={majorId ?? ""}
+                onChange={(e) => {
+                  setMajorId(Number(e.target.value));
+                  resetSelections();
+                }}
+              >
+                {majorsForSchool.length === 0 && (
+                  <option value="">No majors</option>
+                )}
+                {majorsForSchool.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
                   </option>
                 ))}
               </select>
@@ -482,12 +452,12 @@ const StudentDashboard: React.FC = () => {
             <div className="card-row">
               <span className="field-label">Select Classes:</span>
 
-              {isLoadingSkills ? (
+              {isLoadingClasses ? (
                 <p
                   className="text-muted"
                   style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}
                 >
-                  Loading skills from database...
+                  Loading classes...
                 </p>
               ) : availableClasses && availableClasses.length > 0 ? (
                 <div className="class-grid">
@@ -586,6 +556,14 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
 
+            <CareerGoalsInput
+              goals={careerGoals}
+              onChange={(goals) => {
+                setCareerGoals(goals);
+                setBullets([]);
+              }}
+            />
+
             <div
               className="generate-row"
               style={{
@@ -605,54 +583,21 @@ const StudentDashboard: React.FC = () => {
                   flexWrap: "wrap",
                 }}
               >
-                <div className="generation-toggle-wrap">
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "skills" ? "active" : ""
-                    }`}
-                  >
-                    Skill Generation
-                  </span>
-
-                  <button
-                    type="button"
-                    className={`generation-toggle ${
-                      generationMode === "talkingPoints" ? "is-on" : ""
-                    }`}
-                    onClick={() => {
-                      setGenerationMode((prev) =>
-                        prev === "skills" ? "talkingPoints" : "skills",
-                      );
-                      setBullets([]);
-                      setErrorMsg(null);
-                    }}
-                  >
-                    <span className="generation-toggle-track">
-                      <span className="generation-toggle-thumb" />
-                    </span>
-                  </button>
-
-                  <span
-                    className={`toggle-label ${
-                      generationMode === "talkingPoints" ? "active" : ""
-                    }`}
-                  >
-                    Talking Points
-                  </span>
-                </div>
+                <Link to="/resume" className="dash-resume-link">
+                  <i className="bi bi-file-earmark-text" aria-hidden="true" /> Writing
+                  resume bullet points? Open the Resume Builder
+                </Link>
               </div>
 
               <button
                 type="button"
                 className={`btn-generate ${isLoading ? "btn-loading" : ""}`}
                 onClick={handleGenerate}
-                disabled={isLoading || isLoadingSkills || needsSectionCount > 0}
+                disabled={isLoading || needsSectionCount > 0}
               >
                 {isLoading
                   ? "Generating..."
-                  : generationMode === "skills"
-                    ? "Generate Skills with AI"
-                    : "Generate Talking Points with AI"}
+                  : "Generate Talking Points with AI"}
               </button>
             </div>
           </div>
@@ -662,9 +607,7 @@ const StudentDashboard: React.FC = () => {
           <div className="card-surface bullets-card">
             <div className="bullets-header">
               <h2 className="card-title">
-                {generationMode === "skills"
-                  ? "Generated Bullet Points:"
-                  : "Generated Talking Points:"}
+                {"Generated Talking Points:"}
               </h2>
 
               <div
@@ -712,9 +655,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="loading-container">
                   <div className="spinner"></div>
                   <p>
-                    {generationMode === "skills"
-                      ? "Generating bullet points with AI..."
-                      : "Generating talking points with AI..."}
+                    {"Generating talking points with AI..."}
                   </p>
                 </div>
               ) : errorMsg ? (
@@ -722,7 +663,7 @@ const StudentDashboard: React.FC = () => {
               ) : bullets.length === 0 ? (
                 <p className="placeholder-text">
                   Select classes and click "Generate" to see your AI-generated
-                  content.
+                  talking points.
                 </p>
               ) : (
                 <ul>

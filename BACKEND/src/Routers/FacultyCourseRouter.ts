@@ -1,3 +1,4 @@
+import { RequireFaculty } from "../Middleware/RequireFaculty.js";
 import { Router } from "express";
 import {
   getCourses,
@@ -10,14 +11,34 @@ import {
   createNewCourse,
   resolveOrCreateSkill,
 } from "../Controllers/FacultyCourseController.js";
+import { getAggregateProgress } from "../Controllers/ProgressController.js";
+import {
+  getFacultyReviews,
+  getFavorites,
+  starStudent,
+  unstarStudent,
+  getStudentsToReview,
+  saveFacultyReview,
+} from "../Controllers/SkillReviewController.js";
 
 export const facultyCoursesRouter = Router();
+
+// Everything under /api/faculty is for faculty and admins. Server.ts only
+// checks for a login, so without this a student could list, create and
+// claim courses.
+facultyCoursesRouter.use(RequireFaculty);
 
 // --- Data Fetching Routes ---
 facultyCoursesRouter.get("/courses", getCourses);
 facultyCoursesRouter.get("/unassigned-courses", fetchUnassignedCourses);
 facultyCoursesRouter.get("/skills-options", getSkillsOptions);
 facultyCoursesRouter.get("/courses/:courseId/mapping", getCourseMapping);
+facultyCoursesRouter.get("/progress", RequireFaculty, getAggregateProgress);
+facultyCoursesRouter.get("/reviews", RequireFaculty, getFacultyReviews);
+facultyCoursesRouter.get("/reviews/students", RequireFaculty, getStudentsToReview);
+facultyCoursesRouter.get("/reviews/favorites", RequireFaculty, getFavorites);
+facultyCoursesRouter.put("/reviews/favorites/:studentId", RequireFaculty, starStudent);
+facultyCoursesRouter.delete("/reviews/favorites/:studentId", RequireFaculty, unstarStudent);
 
 // --- Validation Routes (Must go before generic /:courseId routes) ---
 facultyCoursesRouter.get("/courses/check-code", checkCourseCode);
@@ -27,3 +48,8 @@ facultyCoursesRouter.post("/courses", createNewCourse);
 facultyCoursesRouter.put("/courses/:courseId/mapping", updateCourseMapping);
 facultyCoursesRouter.put("/courses/:courseId/claim", claimCourse);
 facultyCoursesRouter.post("/skills/resolve", resolveOrCreateSkill);
+facultyCoursesRouter.put(
+  "/reviews/students/:studentId",
+  RequireFaculty,
+  saveFacultyReview,
+);

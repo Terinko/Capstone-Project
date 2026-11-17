@@ -1,155 +1,116 @@
 // BACKEND/src/Routers/ResumeRouter.ts
 import express from "express";
-// Optional: If you have an auth middleware, import it here to protect this route
-// import { requireAuth } from '../Middleware/RequireAuth';
+import {
+  buildResumePrompt,
+  buildTalkingPointsPrompt,
+  loadResumeInput,
+  parseResumeRequest,
+} from "../Models/ResumeInputModel.js";
+import { generateBlocks } from "../Models/ResumeBlocksModel.js";
+import { getDraft, parseDraft, saveDraft } from "../Models/ResumeDraftModel.js";
+import { getCourseHistory, getStudentProfile } from "../Models/RoadmapModel.js";
+import { completeWithFallback } from "../Utils/openRouter.js";
 
 const router = express.Router();
 
-const buildResumePrompt = (
-  classBlocks: string,
-) => `Act as a professional resume writer.
-I will provide skills and tasks learned, grouped by university course.
-Transform these into strong, action-oriented resume bullet points, grouped by course.
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : "Unknown error");
 
-${classBlocks}
-
-Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
-2. Under each course, list 2-4 bullet points using strong action verbs (e.g., Engineered, Orchestrated, Developed).
-3. Consolidate related skills within the same course where appropriate.
-4. Do not include any markdown formatting.
-5. Return plain text only, with course headers followed by bullet points on new lines.
-`;
-
-const buildTalkingPointsPrompt = (
-  classBlocks: string,
-) => `Act as a technical interview coach.
-
-I will provide skills and tasks learned, grouped by university course.
-Transform them into interview-ready talking points that a student can say out loud.
-
-${classBlocks}
-
-Requirements:
-1. Output each course as a labeled section header using only alphabetical and numeric characters and a colon (e.g., "SER-491:").
-2. For each skill provided, generate EXACTLY ONE talking point.
-3. Do NOT combine skills together.
-4. Do NOT create multiple talking points for a single skill.
-5. Each talking point must be on its own new line and begin with a dash (-).
-6. Write each talking point in first-person language (e.g., "I built...", "I implemented...", "I worked with...").
-7. Each talking point should:
-   - Clearly explain what was done
-   - Reference tools, technologies, or concepts when possible
-   - Sound natural for an interview response
-8. Keep each talking point concise (1-2 sentences max).
-9. Do not include markdown formatting.
-10. Return plain text only.
-
-Strict Rule:
-- If a course has N skills listed, you must return exactly N talking points for that course.
-- Maintain a one-to-one mapping between input skills and output talking points.
-`;
-
-// Add your requireAuth middleware here if you want to restrict this to logged-in users
+// Mounted behind RequireStudent. The body holds only what the student
+// picked (REQ-RES-1): { mode, courseIds, projectIds, careerGoals }. Skills
+// and project details are looked up on the server.
 router.post("/generate", async (req, res) => {
   try {
-    const { skillsByClass, mode } = req.body;
-
-    if (!skillsByClass || Object.keys(skillsByClass).length === 0) {
-      return res
-        .status(400)
-        .json({ error: "No skills provided for generation." });
+    const parsed = parseResumeRequest(req.body);
+    if ("error" in parsed) {
+      return res.status(400).json({ error: parsed.error });
     }
+    const { mode } = parsed.request;
 
-    const classBlocks = Object.entries(skillsByClass)
-      .map(
-        ([courseCode, skills]) =>
-          `Course: ${courseCode}\n${(skills as string[]).map((s: string) => `- ${s}`).join("\n")}`,
-      )
-      .join("\n\n");
+    const input = await loadResumeInput(req.user!.userId, parsed.request);
+    if (input.sections.length === 0) {
+      return res.status(400).json({
+        error:
+          "No skills are listed for the selected classes yet. Pick other classes or add a project.",
+      });
+    }
 
     const prompt =
       mode === "skills"
-        ? buildResumePrompt(classBlocks)
-        : buildTalkingPointsPrompt(classBlocks);
+        ? buildResumePrompt(input)
+        : buildTalkingPointsPrompt(input);
 
-    const API_KEY = process.env.VITE_AIAPIKEY;
-    const OPENROUTER_URL = process.env.VITE_OPEN_ROUTER_URL;
-
-    if (!API_KEY || !OPENROUTER_URL) {
-      throw new Error("Missing OpenRouter credentials in backend environment.");
-    }
-
-    // 1. Define our cascade of models from the .env file
-    const fallbackModels = [
-      process.env.VITE_MODEL_ID_1,
-      process.env.VITE_MODEL_ID_2,
-      process.env.VITE_MODEL_ID_3,
-    ].filter(Boolean) as string[]; // filter(Boolean) removes any undefined ones
-
-    if (fallbackModels.length === 0) {
-      throw new Error("No models defined in environment variables.");
-    }
-
-    let lastError: any = null;
-
-    // 2. Loop through the models. If one fails, try the next.
-    for (const currentModel of fallbackModels) {
-      try {
-        console.log(`Attempting generation with model: ${currentModel}`);
-
-        const payload = {
-          model: currentModel,
-          messages: [{ role: "user", content: prompt }],
-        };
-
-        const response = await fetch(OPENROUTER_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "Student Resume Dashboard",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        // If the API call itself fails (e.g., 502 Bad Gateway, 429 Rate Limit)
-        if (!response.ok) {
-          const errBody = await response.text();
-          throw new Error(`HTTP ${response.status}: ${errBody}`);
-        }
-
-        const result = await response.json();
-        const text = result.choices?.[0]?.message?.content?.trim();
-
-        // Heuristic for a "bad response" - if it's empty or suspiciously short
-        if (!text || text.length < 10) {
-          throw new Error("Response was empty or invalid.");
-        }
-
-        // 3. SUCCESS! Send the response to the frontend and exit the function.
-        console.log(`Success with ${currentModel}`);
-        return res.status(200).json({ text });
-      } catch (err: any) {
-        // Log the failure, save the error, and let the loop continue to the next model
-        console.warn(`Model ${currentModel} failed:`, err.message);
-        lastError = err;
-      }
-    }
-
-    // 4. If the loop finishes without returning, it means ALL models failed.
-    console.error("All fallback models exhausted. Last error:", lastError);
-    return res
-      .status(500)
-      .json({
+    // ai_usage_log.feature only allows RESUME, SKILL_SUGGEST and INTERVIEW;
+    // talking points are interview prep.
+    const text = await completeWithFallback(prompt, {
+      feature: mode === "skills" ? "RESUME" : "INTERVIEW",
+      validate: (reply) => {
+        if (reply.length < 10) throw new Error("Response was empty or invalid.");
+      },
+    });
+    if (text == null) {
+      return res.status(500).json({
         error: "Failed to generate AI content. Please try again later.",
       });
+    }
+    return res.status(200).json({ text, sections: input.sections });
   } catch (error: any) {
     console.error("Backend AI Generation Error:", error);
     return res
       .status(500)
       .json({ error: "An unexpected error occurred. Please try again." });
+  }
+});
+
+// GET /resume/options -> who the resume is for: the student's profile
+// and the course ids they've completed, to pre-select on the resume page.
+router.get("/options", async (req, res) => {
+  try {
+    const studentId = req.user!.userId;
+    const [profile, history] = await Promise.all([
+      getStudentProfile(studentId),
+      getCourseHistory(studentId),
+    ]);
+    const completedCourseIds = [...history]
+      .filter(([, status]) => status === "COMPLETED")
+      .map(([id]) => id);
+    res.json({ profile, completedCourseIds });
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+});
+
+// POST /resume/blocks { courseIds, projectIds, careerGoals }
+// One block of bullet points per course and project (REQ-RES-2). To
+// regenerate a single block, send just that course or project (REQ-RES-5).
+router.post("/blocks", async (req, res) => {
+  try {
+    const parsed = parseResumeRequest({ ...req.body, mode: "skills" });
+    if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+    const blocks = await generateBlocks(req.user!.userId, parsed.request);
+    res.json({ blocks });
+  } catch (e) {
+    console.error("Resume block generation failed:", e);
+    res.status(500).json({ error: "Couldn't generate bullet points. Try again." });
+  }
+});
+
+// GET /resume/draft -> the student's saved resume, or no blocks
+router.get("/draft", async (req, res) => {
+  try {
+    res.json(await getDraft(req.user!.userId));
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
+  }
+});
+
+// PUT /resume/draft { blocks } -> save the resume, edits included (REQ-RES-4)
+router.put("/draft", async (req, res) => {
+  try {
+    const parsed = parseDraft(req.body);
+    if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+    res.json(await saveDraft(req.user!.userId, parsed.blocks));
+  } catch (e) {
+    res.status(500).json({ error: errorMessage(e) });
   }
 });
 
